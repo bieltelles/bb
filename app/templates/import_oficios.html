@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Importar Oficios - SEMFAZ{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-file-earmark-pdf me-2"></i>Importar Oficios do Banco do Brasil</h4>
+        <p class="text-muted mb-0">Upload dos PDFs dos oficios mensais para importacao automatica</p>
+    </div>
+    <a href="{{ url_for('competencia_list') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+</div>
+
+{% if step == 'upload' or not results %}
+<!-- STEP 1: Upload -->
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow border-0">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-upload me-2"></i>Selecione os PDFs dos Oficios</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="analyze">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Arquivos PDF (1 a 6 oficios)</label>
+                        <input type="file" class="form-control form-control-lg" name="pdfs"
+                               accept=".pdf" multiple required>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Aceita os 6 oficios mensais do BB:
+                            CBR 1a quinzena, CBR 2a quinzena, Arrecadacao, ORBAN, Pagamentos, Salarios
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <h6 class="mb-2"><i class="bi bi-lightbulb me-2"></i>Como funciona:</h6>
+                        <ol class="mb-0 small">
+                            <li>Selecione os PDFs dos oficios recebidos do Banco do Brasil</li>
+                            <li>O sistema analisa cada PDF e extrai automaticamente os servicos</li>
+                            <li>Confira os dados no preview e confirme a importacao</li>
+                            <li>Os itens serao criados na competencia com IR calculado automaticamente</li>
+                        </ol>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-search me-2"></i>Analisar PDFs
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% elif step == 'preview' %}
+<!-- STEP 2: Preview & Confirm -->
+<div class="alert alert-info mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <strong><i class="bi bi-check-circle me-2"></i>{{ results|length }} oficio(s) analisado(s)</strong>
+            {% set total_items = results|sum(attribute='items')|length if results else 0 %}
+            {% set ns = namespace(total_bruto=0, total_ir=0, total_items=0) %}
+            {% for r in results %}
+                {% for item in r.get('items', []) %}
+                    {% set ns.total_bruto = ns.total_bruto + item.valor_total %}
+                    {% set ns.total_ir = ns.total_ir + item.ir_value %}
+                    {% set ns.total_items = ns.total_items + 1 %}
+                {% endfor %}
+            {% endfor %}
+            <span class="ms-3">{{ ns.total_items }} servicos |
+            Total: R$ {{ "%.2f"|format(ns.total_bruto) }} |
+            IR: R$ {{ "%.2f"|format(ns.total_ir) }} |
+            Liquido: R$ {{ "%.2f"|format(ns.total_bruto - ns.total_ir) }}</span>
+        </div>
+        <a href="{{ url_for('import_oficios') }}" class="btn btn-outline-dark btn-sm">
+            <i class="bi bi-arrow-clockwise me-1"></i>Refazer
+        </a>
+    </div>
+</div>
+
+<!-- Confirm form -->
+<form method="POST">
+    <input type="hidden" name="action" value="confirm">
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Mes da Competencia</label>
+            <select class="form-select" name="month">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == detected_month %}selected{% endif %}>
+                    {{ ['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][m] }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Ano</label>
+            <input type="number" class="form-control" name="year"
+                   value="{{ detected_year or 2026 }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Status</label>
+            <select class="form-select" name="status">
+                <option>PENDENTE</option>
+                <option selected>EM ANALISE</option>
+                <option>LIQUIDADO</option>
+                <option>PAGO</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Results per oficio -->
+    {% for r in results %}
+    <div class="card mb-3 border-{{ 'success' if r.get('valid') else 'warning' }}">
+        <div class="card-header d-flex justify-content-between align-items-center
+                    bg-{{ 'success' if r.get('valid') else 'warning' }} bg-opacity-10">
+            <span>
+                <i class="bi bi-file-earmark-pdf me-2"></i>
+                <strong>Oficio {{ r.get('oficio_num', '')[-1:] or loop.index }}</strong>
+                <small class="text-muted ms-2">{{ r.get('periodo', r.get('filename', '')) }}</small>
+            </span>
+            <div>
+                <span class="badge bg-{{ 'success' if r.get('valid') else 'warning' }} me-2">
+                    {{ r.get('items', [])|length }} servico(s)
+                </span>
+                <span class="badge bg-dark">R$ {{ "%.2f"|format(r.get('valor_bruto', 0)) }}</span>
+                {% if not r.get('valid') and r.get('diff') %}
+                <span class="badge bg-danger ms-1">Dif: R$ {{ "%.2f"|format(r.get('diff', 0)) }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if r.get('error') %}
+            <div class="alert alert-danger m-3">{{ r.error }}</div>
+            {% else %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" style="font-size:.85rem">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Produto</th>
+                            <th>Servico</th>
+                            <th class="text-end">Tarifa</th>
+                            <th class="text-center">Qtd</th>
+                            <th class="text-end">Val. Total</th>
+                            <th class="text-end">IR 2,4%</th>
+                            <th class="text-end">Liquido</th>
+                            <th>Empenho</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in r.get('items', []) %}
+                        <tr class="{{ '' if item.matched else 'table-warning' }}">
+                            <td><small>{{ item.produto }}</small></td>
+                            <td>
+                                {{ item.servico }}
+                                {% if not item.matched %}
+                                <i class="bi bi-exclamation-triangle text-warning"
+                                   title="Nao mapeado automaticamente"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">R$ {{ "%.2f"|format(item.valor_unitario) }}</td>
+                            <td class="text-center fw-bold">{{ "{:,}".format(item.quantidade) }}</td>
+                            <td class="text-end">R$ {{ "%.2f"|format(item.valor_total) }}</td>
+                            <td class="text-end text-danger">R$ {{ "%.2f"|format(item.ir_value) }}</td>
+                            <td class="text-end fw-bold">R$ {{ "%.2f"|format(item.valor_liquido) }}</td>
+                            <td>
+                                {% for e in empenhos %}
+                                    {% if e.sub_elemento == item.sub_elemento %}
+                                    <span class="badge bg-secondary">
+                                        NE {{ e.number }} SE {{ e.sub_elemento }}
+                                    </span>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr class="fw-bold">
+                            <td colspan="4">Subtotal Oficio</td>
+                            {% set ns2 = namespace(sub_tot=0, sub_ir=0) %}
+                            {% for item in r.get('items', []) %}
+                                {% set ns2.sub_tot = ns2.sub_tot + item.valor_total %}
+                                {% set ns2.sub_ir = ns2.sub_ir + item.ir_value %}
+                            {% endfor %}
+                            <td class="text-end">R$ {{ "%.2f"|format(ns2.sub_tot) }}</td>
+                            <td class="text-end text-danger">R$ {{ "%.2f"|format(ns2.sub_ir) }}</td>
+                            <td class="text-end">R$ {{ "%.2f"|format(ns2.sub_tot - ns2.sub_ir) }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Grand Total & Confirm -->
+    <div class="card border-primary mb-3">
+        <div class="card-body py-2 d-flex justify-content-between align-items-center">
+            <strong>TOTAL GERAL</strong>
+            <div>
+                <span class="me-3">Bruto: <strong>R$ {{ "%.2f"|format(ns.total_bruto) }}</strong></span>
+                <span class="me-3 text-danger">IR: <strong>R$ {{ "%.2f"|format(ns.total_ir) }}</strong></span>
+                <span class="text-success">Liquido: <strong>R$ {{ "%.2f"|format(ns.total_bruto - ns.total_ir) }}</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 justify-content-end">
+        <a href="{{ url_for('import_oficios') }}" class="btn btn-secondary btn-lg">
+            <i class="bi bi-x-circle me-1"></i>Cancelar
+        </a>
+        <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-check-circle me-2"></i>Confirmar Importacao ({{ ns.total_items }} itens)
+        </button>
+    </div>
+</form>
+{% endif %}
+{% endblock %}
