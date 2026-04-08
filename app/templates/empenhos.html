@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Empenhos - SEMFAZ{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-wallet2 me-2"></i>Empenhos</h4>
+        <p class="text-muted mb-0">{{ contract.display_name }} - Gestao dos empenhos e execucao</p>
+    </div>
+</div>
+
+{% for emp in empenhos %}
+<div class="card border-0 shadow-sm mb-4 empenho-{{ emp.sub_elemento }}">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-0">Empenho {{ emp.display_number }}
+                <span class="badge bg-primary ms-2">SE {{ emp.sub_elemento }}</span>
+            </h5>
+            <small class="text-muted">{{ emp.description }}</small>
+        </div>
+        <div class="text-end">
+            <p class="mb-0 small text-muted">Execucao</p>
+            <h5 class="mb-0 {% if emp.execution_percentage > 90 %}text-danger{% elif emp.execution_percentage > 70 %}text-warning{% else %}text-success{% endif %}">
+                {{ emp.execution_percentage|pct }}
+            </h5>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Progress bar -->
+        <div class="progress mb-3" style="height: 12px;">
+            <div class="progress-bar
+                {% if emp.execution_percentage > 90 %}bg-danger
+                {% elif emp.execution_percentage > 70 %}bg-warning
+                {% else %}bg-success{% endif %}"
+                 style="width: {{ [emp.execution_percentage, 100]|min }}%"></div>
+        </div>
+
+        <!-- Summary -->
+        <div class="row text-center mb-3">
+            <div class="col-md-2">
+                <p class="text-muted mb-0 small">Valor Inicial</p>
+                <p class="fw-bold mb-0">{{ emp.initial_value|brl_always }}</p>
+            </div>
+            <div class="col-md-2">
+                <p class="text-muted mb-0 small">Reforco</p>
+                <p class="fw-bold text-info mb-0">{{ emp.reinforcement_value|brl_always }}</p>
+            </div>
+            <div class="col-md-2">
+                <p class="text-muted mb-0 small">Anulacao</p>
+                <p class="fw-bold text-danger mb-0">{{ emp.annulment_value|brl_always }}</p>
+            </div>
+            <div class="col-md-2">
+                <p class="text-muted mb-0 small">Total Empenhado</p>
+                <p class="fw-bold text-primary mb-0">{{ emp.total_value|brl_always }}</p>
+            </div>
+            <div class="col-md-2">
+                <p class="text-muted mb-0 small">Executado</p>
+                <p class="fw-bold text-success mb-0">{{ emp.total_executed|brl_always }}</p>
+            </div>
+            <div class="col-md-2">
+                <p class="text-muted mb-0 small">Saldo</p>
+                <p class="fw-bold {% if emp.balance > 0 %}text-info{% else %}text-danger{% endif %} mb-0">
+                    {{ emp.balance|brl_always }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Edit Values -->
+        <div class="accordion mb-3" id="accordionEmp{{ emp.id }}">
+            <div class="accordion-item border-0">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed py-2 small" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#collapseEmp{{ emp.id }}">
+                        <i class="bi bi-pencil me-2"></i>Editar Valores do Empenho
+                    </button>
+                </h2>
+                <div id="collapseEmp{{ emp.id }}" class="accordion-collapse collapse">
+                    <div class="accordion-body">
+                        <form method="POST" action="{{ url_for('update_empenho', id=emp.id) }}">
+                            <div class="row">
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">Valor Inicial (R$)</label>
+                                    <input type="text" class="form-control" name="initial_value"
+                                           value="{{ emp.initial_value }}">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">Reforco (R$)</label>
+                                    <input type="text" class="form-control" name="reinforcement_value"
+                                           value="{{ emp.reinforcement_value }}">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">Anulacao (R$)</label>
+                                    <input type="text" class="form-control" name="annulment_value"
+                                           value="{{ emp.annulment_value }}">
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label">Descricao</label>
+                                    <input type="text" class="form-control" name="description"
+                                           value="{{ emp.description }}">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm mt-2">
+                                <i class="bi bi-check me-1"></i>Salvar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Breakdown -->
+        {% if empenho_monthly.get(emp.id) %}
+        <h6 class="mb-2"><i class="bi bi-calendar3 me-2"></i>Execucao Mensal</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Competencia</th>
+                        <th class="text-end">Valor Total</th>
+                        <th class="text-end">IR</th>
+                        <th class="text-end">Valor Liquido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, data in empenho_monthly[emp.id].items() %}
+                    <tr>
+                        <td>{{ data.competencia }}</td>
+                        <td class="text-end">{{ data.valor_total|brl }}</td>
+                        <td class="text-end text-danger">{{ data.ir|brl }}</td>
+                        <td class="text-end fw-bold">{{ data.liquido|brl }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light">
+                    <tr class="fw-bold">
+                        <td>TOTAL</td>
+                        <td class="text-end">{{ emp.total_executed|brl_always }}</td>
+                        <td class="text-end text-danger">{{ emp.total_ir|brl_always }}</td>
+                        <td class="text-end">{{ emp.total_liquido|brl_always }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted small">Nenhuma execucao registrada para este empenho.</p>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

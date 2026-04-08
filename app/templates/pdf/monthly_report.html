@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatorio Mensal - {{ competencia.display_name }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 9pt;
+            color: #333;
+            line-height: 1.4;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #003366;
+            padding-bottom: 10px;
+        }
+        .header h1 {
+            font-size: 14pt;
+            color: #003366;
+            margin: 0;
+        }
+        .header h2 {
+            font-size: 11pt;
+            color: #003366;
+            margin: 3px 0;
+        }
+        .header p {
+            font-size: 9pt;
+            margin: 2px 0;
+            color: #555;
+        }
+        .section-title {
+            font-size: 10pt;
+            font-weight: bold;
+            color: #003366;
+            border-bottom: 1px solid #003366;
+            padding-bottom: 3px;
+            margin: 15px 0 8px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        th, td {
+            border: 1px solid #999;
+            padding: 4px 6px;
+            font-size: 8pt;
+        }
+        th {
+            background-color: #003366;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        td {
+            text-align: right;
+        }
+        td:first-child, td:nth-child(2) {
+            text-align: left;
+        }
+        .subtotal td {
+            background-color: #e8e8e8;
+            font-weight: bold;
+        }
+        .total td {
+            background-color: #003366;
+            color: white;
+            font-weight: bold;
+        }
+        .info-table {
+            width: 100%;
+            border: none;
+            margin-bottom: 10px;
+        }
+        .info-table td {
+            border: none;
+            padding: 2px 5px;
+            font-size: 9pt;
+            text-align: left;
+        }
+        .info-table td.label {
+            font-weight: bold;
+            width: 35%;
+            color: #003366;
+        }
+        .signatures {
+            margin-top: 40px;
+            width: 100%;
+        }
+        .signatures td {
+            border: none;
+            text-align: center;
+            padding-top: 40px;
+            font-size: 9pt;
+            width: 50%;
+        }
+        .signatures .line {
+            border-top: 1px solid #333;
+            display: inline-block;
+            width: 80%;
+            margin-bottom: 3px;
+        }
+        .footer {
+            text-align: center;
+            font-size: 7pt;
+            color: #999;
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>PREFEITURA MUNICIPAL DE SAO LUIS</h1>
+        <h2>SECRETARIA MUNICIPAL DE FAZENDA - SEMFAZ</h2>
+        <p><strong>RELATORIO MENSAL DE LIQUIDACAO DE DESPESA</strong></p>
+    </div>
+
+    <!-- Contract Info -->
+    <table class="info-table">
+        <tr>
+            <td class="label">Contrato:</td>
+            <td>No {{ contract.number }}/{{ contract.year }} - {{ contract.contractor }}</td>
+        </tr>
+        <tr>
+            <td class="label">CNPJ:</td>
+            <td>{{ contract.cnpj or '00.000.000/0001-91' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Competencia:</td>
+            <td>{{ competencia.display_name }}</td>
+        </tr>
+        <tr>
+            <td class="label">Oficio:</td>
+            <td>{{ competencia.oficio_number or 'N/A' }}
+                {% if competencia.oficio_date %} - {{ competencia.oficio_date.strftime('%d/%m/%Y') }}{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="label">Status:</td>
+            <td>{{ competencia.status }}</td>
+        </tr>
+    </table>
+
+    <!-- Items by Empenho -->
+    {% for emp_id, data in summary_by_empenho.items() %}
+    <div class="section-title">
+        Empenho {{ data.empenho.display_number }} - SubElemento {{ data.empenho.sub_elemento }} - {{ data.empenho.description }}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:20%">Produto</th>
+                <th style="width:25%">Servico</th>
+                <th style="width:10%">Periodo</th>
+                <th style="width:8%">Qtd</th>
+                <th style="width:9%">Val.Unit.</th>
+                <th style="width:10%">Val.Total</th>
+                <th style="width:8%">IR (2,4%)</th>
+                <th style="width:10%">Val.Liquido</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data.service_items %}
+            <tr>
+                <td>{{ item.produto }}</td>
+                <td>{{ item.servico }}</td>
+                <td style="text-align:center">{{ item.data_evento or '-' }}</td>
+                <td style="text-align:center">{{ item.quantidade }}</td>
+                <td>{{ item.valor_unitario|brl }}</td>
+                <td>{{ item.valor_total|brl }}</td>
+                <td>{{ item.ir_value|brl }}</td>
+                <td>{{ item.valor_liquido|brl }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="subtotal">
+                <td colspan="5">Subtotal - Empenho {{ data.empenho.display_number }}</td>
+                <td>{{ data.valor_total|brl_always }}</td>
+                <td>{{ data.total_ir|brl_always }}</td>
+                <td>{{ data.total_liquido|brl_always }}</td>
+            </tr>
+        </tfoot>
+    </table>
+    {% endfor %}
+
+    <!-- Grand Total -->
+    <table>
+        <tr class="total">
+            <td colspan="5" style="text-align:left; color:white;">TOTAL GERAL DA COMPETENCIA</td>
+            <td style="color:white;">{{ competencia.valor_total|brl_always }}</td>
+            <td style="color:white;">{{ competencia.total_ir|brl_always }}</td>
+            <td style="color:white;">{{ competencia.total_liquido|brl_always }}</td>
+        </tr>
+    </table>
+
+    <!-- Tax Info -->
+    <p style="font-size:8pt; color:#666; margin-top:8px;">
+        <strong>Base Legal:</strong> IR retido conforme Tema 1130 do STF e IN RFB No 1.234/2012.
+        Aliquota IRRF: 2,4%. CSLL, COFINS, PIS/PASEP: dispensados para instituicoes financeiras.
+    </p>
+
+    <!-- Signatures -->
+    <table class="signatures">
+        <tr>
+            <td>
+                <div class="line"></div><br>
+                Fiscal do Contrato<br>
+                <small>SEMFAZ - Sao Luis/MA</small>
+            </td>
+            <td>
+                <div class="line"></div><br>
+                Gestor do Contrato<br>
+                <small>SEMFAZ - Sao Luis/MA</small>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Footer -->
+    <div class="footer">
+        Documento gerado em {{ generation_date.strftime('%d/%m/%Y') }} |
+        SEMFAZ - Sistema de Acompanhamento Contratual |
+        Contrato {{ contract.number }}/{{ contract.year }}
+    </div>
+</body>
+</html>

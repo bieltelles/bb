@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Acompanhamento Contratual - SEMFAZ{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-graph-up me-2"></i>Acompanhamento Contratual</h4>
+        <p class="text-muted mb-0">{{ contract.display_name }} - {{ contract.contractor }}</p>
+    </div>
+    <a href="{{ url_for('contract_tracking_pdf') }}" class="btn btn-outline-danger" target="_blank">
+        <i class="bi bi-file-pdf me-1"></i>Exportar PDF
+    </a>
+</div>
+
+<!-- Empenho Balance Cards -->
+<div class="row mb-4">
+    {% for emp in empenhos %}
+    <div class="col-lg-4 mb-3">
+        <div class="card border-0 shadow-sm empenho-{{ emp.sub_elemento }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">{{ emp.display_number }} <span class="badge bg-primary">SE {{ emp.sub_elemento }}</span></h6>
+                    <span class="fw-bold {% if emp.execution_percentage > 90 %}text-danger{% elif emp.execution_percentage > 70 %}text-warning{% else %}text-success{% endif %}">
+                        {{ emp.execution_percentage|pct }}
+                    </span>
+                </div>
+                <div class="progress mb-2" style="height: 8px;">
+                    <div class="progress-bar
+                        {% if emp.execution_percentage > 90 %}bg-danger
+                        {% elif emp.execution_percentage > 70 %}bg-warning
+                        {% else %}bg-success{% endif %}"
+                         style="width: {{ [emp.execution_percentage, 100]|min }}%"></div>
+                </div>
+                <div class="row text-center small">
+                    <div class="col-4">
+                        <span class="text-muted d-block">Empenhado</span>
+                        <strong>{{ emp.total_value|brl_always }}</strong>
+                    </div>
+                    <div class="col-4">
+                        <span class="text-muted d-block">Executado</span>
+                        <strong class="text-success">{{ emp.total_executed|brl_always }}</strong>
+                    </div>
+                    <div class="col-4">
+                        <span class="text-muted d-block">Saldo</span>
+                        <strong class="{% if emp.balance > 0 %}text-info{% else %}text-danger{% endif %}">{{ emp.balance|brl_always }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Execution Matrix -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0">
+        <h6 class="mb-0"><i class="bi bi-table me-2"></i>Matriz de Execucao</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 matrix-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Competencia</th>
+                        {% for emp in empenhos %}
+                        <th class="text-end">NE {{ emp.number }}<br><small>SE {{ emp.sub_elemento }}</small></th>
+                        {% endfor %}
+                        <th class="text-end">Total Bruto</th>
+                        <th class="text-end">IR</th>
+                        <th class="text-end">Liquido</th>
+                        <th class="text-end">Acumulado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in matrix %}
+                    <tr>
+                        <td><strong>{{ row.competencia.display_name }}</strong></td>
+                        {% for emp in empenhos %}
+                        <td class="text-end">{{ row.empenhos[emp.id].valor|brl }}</td>
+                        {% endfor %}
+                        <td class="text-end">{{ row.total|brl }}</td>
+                        <td class="text-end text-danger">{{ row.total_ir|brl }}</td>
+                        <td class="text-end">{{ row.total_liquido|brl }}</td>
+                        <td class="text-end fw-bold">{{ row.acumulado_geral|brl }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not matrix %}
+                    <tr>
+                        <td colspan="{{ empenhos|length + 5 }}" class="text-center py-4 text-muted">
+                            Nenhuma competencia registrada.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+                {% if matrix %}
+                <tfoot class="table-light">
+                    <tr class="fw-bold">
+                        <td>TOTAL EXECUTADO</td>
+                        {% for emp in empenhos %}
+                        <td class="text-end">{{ running_totals[emp.id]|brl_always }}</td>
+                        {% endfor %}
+                        {% set total_exec = running_totals.values()|sum %}
+                        <td class="text-end">{{ total_exec|brl_always }}</td>
+                        <td class="text-end text-danger">
+                            {% set total_ir_all = matrix|map(attribute='total_ir')|sum %}
+                            {{ total_ir_all|brl_always }}
+                        </td>
+                        <td class="text-end">
+                            {% set total_liq_all = matrix|map(attribute='total_liquido')|sum %}
+                            {{ total_liq_all|brl_always }}
+                        </td>
+                        <td class="text-end">{{ total_exec|brl_always }}</td>
+                    </tr>
+                    <tr class="fw-bold table-warning">
+                        <td>SALDO DISPONIVEL</td>
+                        {% for emp in empenhos %}
+                        <td class="text-end">{{ (emp.total_value - running_totals[emp.id])|brl_always }}</td>
+                        {% endfor %}
+                        {% set total_empenhado = empenhos|map(attribute='total_value')|sum %}
+                        <td class="text-end" colspan="4">{{ (total_empenhado - total_exec)|brl_always }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

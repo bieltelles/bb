@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Servicos - SEMFAZ{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-gear me-2"></i>Configuracao de Servicos</h4>
+        <p class="text-muted mb-0">Tipos de servico pre-cadastrados para preenchimento rapido</p>
+    </div>
+</div>
+
+<!-- Add Service Type Form -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+        <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Adicionar Tipo de Servico</h6>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('services_config') }}">
+            <input type="hidden" name="action" value="add">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Produto (Categoria)</label>
+                    <select class="form-select" name="produto" required>
+                        <option value="">Selecione...</option>
+                        {% for p in produtos %}
+                        <option value="{{ p }}">{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5 mb-3">
+                    <label class="form-label">Nome do Servico</label>
+                    <input type="text" class="form-control" name="nome" required
+                           placeholder="Ex: CBR Liquidacao Guiche">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">SubElemento</label>
+                    <select class="form-select" name="sub_elemento" required>
+                        <option value="98">98 - Recebimentos/Cobranca</option>
+                        <option value="93">93 - Folha de Pagamento</option>
+                        <option value="92">92 - Pagamentos</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Valor Contrato (Ref.)</label>
+                    <input type="text" class="form-control" name="valor_contrato"
+                           placeholder="Ex: R$ 4,95">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Valor Unitario Padrao (R$)</label>
+                    <input type="text" class="form-control" name="valor_unitario_padrao"
+                           required placeholder="4.95">
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">IR (%)</label>
+                    <input type="text" class="form-control" name="ir_rate" value="2.4">
+                </div>
+                <div class="col-md-2 mb-3">
+                    <div class="form-check mt-4">
+                        <input type="checkbox" class="form-check-input" name="ir_applicable" checked>
+                        <label class="form-check-label">IR Aplicavel</label>
+                    </div>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary d-block w-100">
+                        <i class="bi bi-check me-1"></i>Adicionar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Existing Service Types -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0">
+        <h6 class="mb-0"><i class="bi bi-list-check me-2"></i>Servicos Cadastrados ({{ service_types|length }})</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 0.88rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Produto</th>
+                        <th>Nome do Servico</th>
+                        <th class="text-center">SubElemento</th>
+                        <th>Valor Contrato</th>
+                        <th class="text-end">Valor Unit. Padrao</th>
+                        <th class="text-center">IR</th>
+                        <th class="text-center">Acoes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for st in service_types %}
+                    <tr>
+                        <td><small class="text-muted">{{ st.produto }}</small></td>
+                        <td>{{ st.nome }}</td>
+                        <td class="text-center"><span class="badge bg-primary">{{ st.sub_elemento }}</span></td>
+                        <td>{{ st.valor_contrato or '-' }}</td>
+                        <td class="text-end">R$ {{ '%.2f'|format(st.valor_unitario_padrao) }}</td>
+                        <td class="text-center">
+                            {% if st.ir_applicable %}
+                            <span class="badge bg-warning text-dark">{{ '%.1f'|format(st.ir_rate * 100) }}%</span>
+                            {% else %}
+                            <span class="badge bg-light text-muted">Isento</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <form method="POST" action="{{ url_for('services_config') }}"
+                                  onsubmit="return confirm('Remover este servico?');" style="display:inline;">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="service_type_id" value="{{ st.id }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not service_types %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            Nenhum servico cadastrado. Execute <code>python seed_data.py</code> para popular dados iniciais.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEMFAZ - Acompanhamento Contratual BB 591/2025</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+body{background:#f0f2f5;font-family:'Segoe UI',system-ui,sans-serif}
+.icon-box{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+.card-dash{transition:transform .2s;border-radius:12px;border:0}
+.card-dash:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,.1)!important}
+.summary-card{border-left:4px solid;border-radius:8px;border:0}
+.empenho-98{border-left:4px solid #0d6efd}
+.empenho-93{border-left:4px solid #198754}
+.empenho-92{border-left:4px solid #fd7e14}
+.matrix-table th,.matrix-table td{font-size:.82rem;padding:.4rem .5rem;text-align:right}
+.matrix-table th:first-child,.matrix-table td:first-child{text-align:left}
+.matrix-table tfoot td{font-weight:700;border-top:2px solid #333}
+.nav-section{display:none}.nav-section.active{display:block}
+.cursor-pointer{cursor:pointer}
+@media print{.no-print,.navbar,.footer-bar{display:none!important}body{background:#fff}.nav-section{display:block!important}}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm no-print">
+<div class="container-fluid">
+<a class="navbar-brand d-flex align-items-center" href="#" onclick="showSection('dashboard')">
+<i class="bi bi-bank2 me-2"></i><span class="fw-bold">SEMFAZ</span>
+<span class="ms-2 d-none d-md-inline text-white-50">| Contrato BB 591/2025</span>
+</a>
+<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav1"><span class="navbar-toggler-icon"></span></button>
+<div class="collapse navbar-collapse" id="nav1">
+<ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link active" href="#" onclick="showSection('dashboard')" id="nav-dashboard"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+<li class="nav-item"><a class="nav-link" href="#" onclick="showSection('competencias')" id="nav-competencias"><i class="bi bi-calendar-month me-1"></i>Competencias</a></li>
+<li class="nav-item"><a class="nav-link" href="#" onclick="showSection('empenhos')" id="nav-empenhos"><i class="bi bi-wallet2 me-1"></i>Empenhos</a></li>
+<li class="nav-item"><a class="nav-link" href="#" onclick="showSection('acompanhamento')" id="nav-acompanhamento"><i class="bi bi-graph-up me-1"></i>Acompanhamento</a></li>
+</ul>
+</div>
+</div>
+</nav>
+<main class="container-fluid py-3">
+<div id="sec-dashboard" class="nav-section active"></div>
+<div id="sec-competencias" class="nav-section"></div>
+<div id="sec-comp-detail" class="nav-section"></div>
+<div id="sec-empenhos" class="nav-section"></div>
+<div id="sec-acompanhamento" class="nav-section"></div>
+</main>
+<div class="modal fade" id="itemModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content">
+<div class="modal-header bg-primary text-white"><h5 class="modal-title" id="itemModalTitle">Adicionar Item</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+<div class="modal-body" id="itemModalBody"></div>
+<div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" id="itemModalSave">Salvar</button></div>
+</div></div></div>
+<div class="modal fade" id="compModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+<div class="modal-header bg-primary text-white"><h5 class="modal-title">Nova Competencia</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+<div class="modal-body" id="compModalBody"></div>
+<div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" id="compModalSave">Criar</button></div>
+</div></div></div>
+<div class="modal fade" id="empModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+<div class="modal-header bg-primary text-white"><h5 class="modal-title">Editar Empenho</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+<div class="modal-body" id="empModalBody"></div>
+<div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" id="empModalSave">Salvar</button></div>
+</div></div></div>
+<footer class="py-2 bg-light border-top text-muted small text-center no-print footer-bar">
+SEMFAZ - Secretaria Municipal de Fazenda | Sistema de Acompanhamento Contratual | Contrato 591/2025 - Banco do Brasil S.A.
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ==================== DATA LAYER ====================
+const MESES=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const STORAGE_KEY='semfaz_bb591';
+const IR_RATE=0.024;
+
+const SERVICE_TYPES=[
+{produto:'COBRANCA COM REGISTRO',nome:'CBR Liquidacao Guiche',se:'98',valor:4.95},
+{produto:'COBRANCA COM REGISTRO',nome:'CBR Liquidacao PIX',se:'98',valor:0.87},
+{produto:'RECEBIMENTO',nome:'Tarifa Guia c/ Barra Internet',se:'98',valor:2.53},
+{produto:'RECEBIMENTO',nome:'Tarifa Guia c/ Cod. Barras TAA',se:'98',valor:2.53},
+{produto:'RECEBIMENTO',nome:'Tarifa Guia c/ Cod. Barr Gefin',se:'98',valor:2.53},
+{produto:'RECEBIMENTO',nome:'Tarifa Guia c/ Cod. Barr Coban',se:'98',valor:2.53},
+{produto:'RECEBIMENTO',nome:'Tarifa Guia c/ Cod. Barras PGT',se:'98',valor:2.53},
+{produto:'RECEBIMENTO',nome:'Tarifa Arrec TAA Multibanco',se:'98',valor:2.53},
+{produto:'RECEBIMENTO',nome:'Guias Arrecadacao Pix Municipal',se:'98',valor:0.87},
+{produto:'ORBAN',nome:'Tarifa Ordem Bancaria-Cred Cta',se:'92',valor:1.02},
+{produto:'ORBAN',nome:'Tarif ORBAN-Fatura c/Cod Barra',se:'92',valor:3.03},
+{produto:'ORBAN',nome:'Tar Ordem Bancaria-Pag Tributo',se:'92',valor:106.50},
+{produto:'PAGAMENTO A FORNECEDORES',nome:'Tarifa Pag Fornec Credito Cta',se:'92',valor:1.02},
+{produto:'PAGAMENTO A FORNECEDORES',nome:'Tarifa Pgto Fornecedores TED',se:'92',valor:4.51},
+{produto:'PAGAMENTOS DIVERSOS',nome:'Tarifa sobre Pagamentos Cred Cta',se:'92',valor:1.02},
+{produto:'PAGAMENTOS DIVERSOS',nome:'Tarifa sobre Pagamentos DOC/TED',se:'92',valor:4.51},
+{produto:'PAGAMENTO DE SALARIO',nome:'Tarifa Pgto Salario Cred Conta',se:'93',valor:1.02}
+];
+
+const DEFAULT_EMPENHOS=[
+{id:1,number:'268',year:2026,se:'98',desc:'Tarifas Bancarias - Recebimentos/Cobranca',initial:0,reinforcement:0,annulment:0},
+{id:2,number:'270',year:2026,se:'93',desc:'Folha de Pagamento',initial:0,reinforcement:0,annulment:0},
+{id:3,number:'271',year:2026,se:'92',desc:'Tarifas Bancarias - Pagamento',initial:0,reinforcement:0,annulment:0}
+];
+
+function loadData(){
+  let d=localStorage.getItem(STORAGE_KEY);
+  if(d) return JSON.parse(d);
+  let data={empenhos:JSON.parse(JSON.stringify(DEFAULT_EMPENHOS)),competencias:[],items:[],nextCompId:1,nextItemId:1};
+  saveData(data);
+  return data;
+}
+function saveData(d){localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}
+function brl(v){if(v==null||v===0)return'R$ -';return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function brl0(v){return(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function pct(v){return(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'}
+function empLabel(e){return e.number+'/'+e.year+' (SE '+e.se+')'}
+function empTotal(e){return(e.initial||0)+(e.reinforcement||0)-(e.annulment||0)}
+function compItems(data,compId){return data.items.filter(i=>i.compId===compId)}
+function empItems(data,empId){return data.items.filter(i=>i.empId===empId)}
+function statusBadge(s){const m={'PENDENTE':'bg-secondary','EM ANALISE':'bg-warning text-dark','LIQUIDADO':'bg-info','PAGO':'bg-success'};return'<span class="badge '+(m[s]||'bg-secondary')+'">'+s+'</span>'}
+
+// ==================== NAVIGATION ====================
+let currentSection='dashboard';
+let currentCompId=null;
+let charts={};
+
+function showSection(name,compId){
+  document.querySelectorAll('.nav-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.navbar-nav .nav-link').forEach(l=>l.classList.remove('active'));
+  let secId='sec-'+name;
+  if(name==='comp-detail') secId='sec-comp-detail';
+  document.getElementById(secId).classList.add('active');
+  let navEl=document.getElementById('nav-'+name);
+  if(navEl) navEl.classList.add('active');
+  currentSection=name;
+  if(name==='dashboard') renderDashboard();
+  else if(name==='competencias') renderCompetencias();
+  else if(name==='comp-detail'){currentCompId=compId;renderCompDetail(compId);}
+  else if(name==='empenhos') renderEmpenhos();
+  else if(name==='acompanhamento') renderAcompanhamento();
+}
+// ==================== DASHBOARD ====================
+function renderDashboard(){
+  const data=loadData();
+  const emps=data.empenhos;
+  let totalEmp=emps.reduce((s,e)=>s+empTotal(e),0);
+  let totalExec=emps.reduce((s,e)=>s+empItems(data,e.id).reduce((a,i)=>a+(i.valorTotal||0),0),0);
+  let totalIR=data.items.reduce((s,i)=>s+(i.irValue||0),0);
+  let totalLiq=data.items.reduce((s,i)=>s+(i.valorLiquido||0),0);
+  let totalSaldo=totalEmp-totalExec;
+
+  // Monthly data
+  let comps=[...data.competencias].sort((a,b)=>a.year-b.year||a.month-b.month);
+  let monthly=comps.map(c=>{
+    let items=compItems(data,c.id);
+    return{label:String(c.month).padStart(2,'0')+'/'+c.year,
+      total:items.reduce((s,i)=>s+(i.valorTotal||0),0),
+      ir:items.reduce((s,i)=>s+(i.irValue||0),0),
+      liq:items.reduce((s,i)=>s+(i.valorLiquido||0),0)};
+  });
+
+  let empExec=emps.map(e=>{
+    let exec=empItems(data,e.id).reduce((s,i)=>s+(i.valorTotal||0),0);
+    return{label:empLabel(e),exec,emp:empTotal(e),pct:empTotal(e)>0?(exec/empTotal(e)*100):0};
+  });
+
+  let html=`
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h4 class="mb-1"><i class="bi bi-speedometer2 me-2"></i>Dashboard - Contrato 591/2025</h4>
+    <p class="text-muted mb-0">Banco do Brasil S.A. - Servicos Financeiros</p></div>
+    <button class="btn btn-primary no-print" onclick="openNewComp()"><i class="bi bi-plus-circle me-1"></i>Nova Competencia</button>
+  </div>
+  <div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3"><div class="card card-dash shadow-sm"><div class="card-body">
+      <div class="d-flex justify-content-between"><div><p class="text-muted mb-1 small">Total Empenhado</p><h4 class="mb-0 text-primary">${brl0(totalEmp)}</h4></div>
+      <div class="icon-box bg-primary bg-opacity-10 text-primary"><i class="bi bi-wallet2"></i></div></div></div></div></div>
+    <div class="col-lg-3 col-md-6 mb-3"><div class="card card-dash shadow-sm"><div class="card-body">
+      <div class="d-flex justify-content-between"><div><p class="text-muted mb-1 small">Total Executado</p><h4 class="mb-0 text-success">${brl0(totalExec)}</h4></div>
+      <div class="icon-box bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle"></i></div></div></div></div></div>
+    <div class="col-lg-3 col-md-6 mb-3"><div class="card card-dash shadow-sm"><div class="card-body">
+      <div class="d-flex justify-content-between"><div><p class="text-muted mb-1 small">IR Retido Total</p><h4 class="mb-0 text-warning">${brl0(totalIR)}</h4></div>
+      <div class="icon-box bg-warning bg-opacity-10 text-warning"><i class="bi bi-receipt"></i></div></div></div></div></div>
+    <div class="col-lg-3 col-md-6 mb-3"><div class="card card-dash shadow-sm"><div class="card-body">
+      <div class="d-flex justify-content-between"><div><p class="text-muted mb-1 small">Saldo Disponivel</p><h4 class="mb-0 ${totalSaldo>=0?'text-info':'text-danger'}">${brl0(totalSaldo)}</h4></div>
+      <div class="icon-box bg-info bg-opacity-10 text-info"><i class="bi bi-piggy-bank"></i></div></div></div></div></div>
+  </div>
+  <div class="row mb-4">
+    <div class="col-lg-8 mb-3"><div class="card border-0 shadow-sm h-100"><div class="card-header bg-white border-0"><h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Execucao Mensal</h6></div>
+    <div class="card-body"><canvas id="chartMonthly" height="280"></canvas></div></div></div>
+    <div class="col-lg-4 mb-3"><div class="card border-0 shadow-sm h-100"><div class="card-header bg-white border-0"><h6 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Por Empenho</h6></div>
+    <div class="card-body d-flex align-items-center justify-content-center"><canvas id="chartEmp" height="250"></canvas></div></div></div>
+  </div>
+  <div class="row mb-4">${emps.map(e=>{
+    let exec=empItems(data,e.id).reduce((s,i)=>s+(i.valorTotal||0),0);
+    let tot=empTotal(e);let p=tot>0?(exec/tot*100):0;
+    let color=p>90?'danger':p>70?'warning':'success';
+    return`<div class="col-lg-4 mb-3"><div class="card border-0 shadow-sm empenho-${e.se}"><div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <div><h6 class="mb-0">NE ${e.number}/${e.year}</h6><small class="text-muted">SE ${e.se} - ${e.desc}</small></div>
+    <span class="badge bg-primary">SE ${e.se}</span></div><div class="card-body">
+    <div class="d-flex justify-content-between mb-1"><small class="text-muted">Execucao</small><small class="fw-bold">${pct(p)}</small></div>
+    <div class="progress mb-3" style="height:10px"><div class="progress-bar bg-${color}" style="width:${Math.min(p,100)}%"></div></div>
+    <div class="row text-center small">
+    <div class="col-4"><p class="text-muted mb-0">Empenhado</p><p class="fw-bold mb-0">${brl0(tot)}</p></div>
+    <div class="col-4"><p class="text-muted mb-0">Executado</p><p class="fw-bold text-success mb-0">${brl0(exec)}</p></div>
+    <div class="col-4"><p class="text-muted mb-0">Saldo</p><p class="fw-bold ${tot-exec>=0?'text-info':'text-danger'} mb-0">${brl0(tot-exec)}</p></div>
+    </div></div></div></div>`;
+  }).join('')}</div>
+  <div class="card border-0 shadow-sm"><div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+  <h6 class="mb-0"><i class="bi bi-calendar-month me-2"></i>Competencias Recentes</h6>
+  <a href="#" onclick="showSection('competencias')" class="btn btn-sm btn-outline-primary no-print">Ver todas</a></div>
+  <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0">
+  <thead class="table-light"><tr><th>Competencia</th><th>Oficio</th><th>Status</th><th class="text-end">Valor Total</th><th class="text-end">IR</th><th class="text-end">Liquido</th><th class="text-center no-print">Acoes</th></tr></thead>
+  <tbody>${comps.reverse().slice(0,6).map(c=>{
+    let items=compItems(data,c.id);
+    let tot=items.reduce((s,i)=>s+(i.valorTotal||0),0);
+    let ir=items.reduce((s,i)=>s+(i.irValue||0),0);
+    let liq=items.reduce((s,i)=>s+(i.valorLiquido||0),0);
+    return`<tr><td><strong>${MESES[c.month]}/${c.year}</strong></td><td>${c.oficio||'-'}</td><td>${statusBadge(c.status)}</td>
+    <td class="text-end">${brl(tot)}</td><td class="text-end">${brl(ir)}</td><td class="text-end fw-bold">${brl(liq)}</td>
+    <td class="text-center no-print"><button class="btn btn-sm btn-outline-primary" onclick="showSection('comp-detail',${c.id})"><i class="bi bi-eye"></i></button></td></tr>`;
+  }).join('')}${comps.length===0?'<tr><td colspan="7" class="text-center py-4 text-muted"><i class="bi bi-inbox display-6 d-block mb-2"></i>Nenhuma competencia cadastrada.</td></tr>':''}</tbody></table></div></div></div>`;
+
+  document.getElementById('sec-dashboard').innerHTML=html;
+  renderCharts(monthly,empExec);
+}
+
+function renderCharts(monthly,empExec){
+  if(charts.monthly) charts.monthly.destroy();
+  if(charts.emp) charts.emp.destroy();
+  const fmt=v=>brl0(v);
+  const ctx1=document.getElementById('chartMonthly');
+  const ctx2=document.getElementById('chartEmp');
+  if(!ctx1||!ctx2) return;
+  if(monthly.length>0){
+    charts.monthly=new Chart(ctx1,{type:'bar',data:{labels:monthly.map(d=>d.label),datasets:[
+      {label:'Valor Total',data:monthly.map(d=>d.total),backgroundColor:'rgba(13,110,253,.7)',borderRadius:4},
+      {label:'IR Retido',data:monthly.map(d=>d.ir),backgroundColor:'rgba(255,193,7,.7)',borderRadius:4},
+      {label:'Valor Liquido',data:monthly.map(d=>d.liq),backgroundColor:'rgba(25,135,84,.7)',borderRadius:4}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{usePointStyle:true,font:{size:11}}},
+    tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1e3?'R$'+(v/1e3).toFixed(0)+'k':'R$'+v}},x:{grid:{display:false}}}}});
+  }
+  const colors=['rgba(13,110,253,.8)','rgba(25,135,84,.8)','rgba(253,126,20,.8)'];
+  if(empExec.some(e=>e.exec>0)){
+    charts.emp=new Chart(ctx2,{type:'doughnut',data:{labels:empExec.map(d=>d.label),datasets:[{data:empExec.map(d=>d.exec),backgroundColor:colors,borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{usePointStyle:true,font:{size:10}}},
+    tooltip:{callbacks:{label:c=>{let t=c.dataset.data.reduce((a,b)=>a+b,0);return c.label+': '+fmt(c.parsed)+' ('+(t>0?(c.parsed/t*100).toFixed(1):0)+'%)'}}}}}});
+  }
+}
+// ==================== COMPETENCIAS ====================
+function renderCompetencias(){
+  const data=loadData();
+  let comps=[...data.competencias].sort((a,b)=>b.year-a.year||b.month-a.month);
+  let totalVal=data.items.reduce((s,i)=>s+(i.valorTotal||0),0);
+  let html=`
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h4 class="mb-1"><i class="bi bi-calendar-month me-2"></i>Competencias</h4><p class="text-muted mb-0">Liquidacao mensal de despesas</p></div>
+    <button class="btn btn-primary" onclick="openNewComp()"><i class="bi bi-plus-circle me-1"></i>Nova Competencia</button></div>
+  <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0">
+  <thead class="table-light"><tr><th>Competencia</th><th>Oficio</th><th>Status</th><th class="text-center">Itens</th><th class="text-end">Valor Total</th><th class="text-end">IR</th><th class="text-end">Valor Liquido</th><th class="text-center">Acoes</th></tr></thead>
+  <tbody>${comps.map(c=>{
+    let items=compItems(data,c.id);
+    let tot=items.reduce((s,i)=>s+(i.valorTotal||0),0);
+    let ir=items.reduce((s,i)=>s+(i.irValue||0),0);
+    let liq=items.reduce((s,i)=>s+(i.valorLiquido||0),0);
+    return`<tr><td><a href="#" onclick="showSection('comp-detail',${c.id})" class="text-decoration-none fw-bold">${MESES[c.month]}/${c.year}</a></td>
+    <td>${c.oficio||'-'}</td><td>${statusBadge(c.status)}</td><td class="text-center"><span class="badge bg-light text-dark">${items.length}</span></td>
+    <td class="text-end">${brl(tot)}</td><td class="text-end text-danger">${brl(ir)}</td><td class="text-end fw-bold">${brl(liq)}</td>
+    <td class="text-center"><div class="btn-group btn-group-sm">
+    <button class="btn btn-outline-primary" onclick="showSection('comp-detail',${c.id})" title="Detalhes"><i class="bi bi-eye"></i></button>
+    <button class="btn btn-outline-danger" onclick="printCompPdf(${c.id})" title="PDF"><i class="bi bi-file-pdf"></i></button>
+    <button class="btn btn-outline-secondary" onclick="deleteComp(${c.id})" title="Excluir"><i class="bi bi-trash"></i></button>
+    </div></td></tr>`;
+  }).join('')}${comps.length===0?'<tr><td colspan="8" class="text-center py-4 text-muted">Nenhuma competencia cadastrada.</td></tr>':''}</tbody></table></div></div></div>`;
+  document.getElementById('sec-competencias').innerHTML=html;
+}
+
+function openNewComp(){
+  document.getElementById('compModalBody').innerHTML=`
+  <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Mes</label><select class="form-select" id="compMonth">
+  ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}"${m===new Date().getMonth()+1?' selected':''}>${MESES[m]}</option>`).join('')}
+  </select></div><div class="col-md-6 mb-3"><label class="form-label">Ano</label><input type="number" class="form-control" id="compYear" value="${new Date().getFullYear()}"></div></div>
+  <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Numero do Oficio</label><input type="text" class="form-control" id="compOficio" placeholder="Ex: 338462609100001-006"></div>
+  <div class="col-md-6 mb-3"><label class="form-label">Status</label><select class="form-select" id="compStatus">
+  <option>PENDENTE</option><option>EM ANALISE</option><option>LIQUIDADO</option><option>PAGO</option></select></div></div>`;
+  document.getElementById('compModalSave').onclick=saveNewComp;
+  new bootstrap.Modal(document.getElementById('compModal')).show();
+}
+
+function saveNewComp(){
+  let data=loadData();
+  let m=parseInt(document.getElementById('compMonth').value);
+  let y=parseInt(document.getElementById('compYear').value);
+  if(data.competencias.find(c=>c.month===m&&c.year===y)){alert('Competencia ja existe!');return;}
+  let comp={id:data.nextCompId++,month:m,year:y,oficio:document.getElementById('compOficio').value,status:document.getElementById('compStatus').value};
+  data.competencias.push(comp);
+  saveData(data);
+  bootstrap.Modal.getInstance(document.getElementById('compModal')).hide();
+  showSection('comp-detail',comp.id);
+}
+
+function deleteComp(id){
+  if(!confirm('Excluir esta competencia e todos os seus itens?')) return;
+  let data=loadData();
+  data.competencias=data.competencias.filter(c=>c.id!==id);
+  data.items=data.items.filter(i=>i.compId!==id);
+  saveData(data);
+  renderCompetencias();
+}
+
+// ==================== COMPETENCIA DETAIL ====================
+function renderCompDetail(compId){
+  const data=loadData();
+  const comp=data.competencias.find(c=>c.id===compId);
+  if(!comp){showSection('competencias');return;}
+  const items=compItems(data,compId);
+  const emps=data.empenhos;
+  let tot=items.reduce((s,i)=>s+(i.valorTotal||0),0);
+  let ir=items.reduce((s,i)=>s+(i.irValue||0),0);
+  let liq=items.reduce((s,i)=>s+(i.valorLiquido||0),0);
+
+  // Summary by empenho
+  let byEmp={};
+  items.forEach(i=>{
+    if(!byEmp[i.empId]) byEmp[i.empId]={items:[],tot:0,ir:0,liq:0};
+    byEmp[i.empId].items.push(i);
+    byEmp[i.empId].tot+=i.valorTotal||0;
+    byEmp[i.empId].ir+=i.irValue||0;
+    byEmp[i.empId].liq+=i.valorLiquido||0;
+  });
+
+  let html=`
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h4 class="mb-1"><i class="bi bi-calendar-check me-2"></i>${MESES[comp.month]}/${comp.year}</h4>
+    <p class="text-muted mb-0">Oficio: ${comp.oficio||'N/A'} ${statusBadge(comp.status)}</p></div>
+    <div class="d-flex gap-2 no-print">
+    <button class="btn btn-outline-secondary btn-sm" onclick="showSection('competencias')"><i class="bi bi-arrow-left me-1"></i>Voltar</button>
+    <button class="btn btn-outline-danger btn-sm" onclick="printCompPdf(${compId})"><i class="bi bi-file-pdf me-1"></i>PDF</button>
+    <button class="btn btn-primary btn-sm" onclick="openAddItem(${compId})"><i class="bi bi-plus-circle me-1"></i>Adicionar Item</button></div></div>
+  <div class="row mb-4">
+    <div class="col-md-3 mb-2"><div class="card border-0 shadow-sm summary-card" style="border-left-color:#0d6efd!important"><div class="card-body py-3"><p class="text-muted mb-0 small">Valor Total Bruto</p><h5 class="mb-0 text-primary">${brl0(tot)}</h5></div></div></div>
+    <div class="col-md-3 mb-2"><div class="card border-0 shadow-sm summary-card" style="border-left-color:#ffc107!important"><div class="card-body py-3"><p class="text-muted mb-0 small">IR Retido (2,4%)</p><h5 class="mb-0 text-warning">${brl0(ir)}</h5></div></div></div>
+    <div class="col-md-3 mb-2"><div class="card border-0 shadow-sm summary-card" style="border-left-color:#198754!important"><div class="card-body py-3"><p class="text-muted mb-0 small">Valor Liquido</p><h5 class="mb-0 text-success">${brl0(liq)}</h5></div></div></div>
+    <div class="col-md-3 mb-2"><div class="card border-0 shadow-sm summary-card" style="border-left-color:#0dcaf0!important"><div class="card-body py-3"><p class="text-muted mb-0 small">Itens</p><h5 class="mb-0 text-info">${items.length}</h5></div></div></div>
+  </div>`;
+
+  // Summary by empenho table
+  if(Object.keys(byEmp).length>0){
+    html+=`<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0"><h6 class="mb-0"><i class="bi bi-wallet2 me-2"></i>Resumo por Empenho</h6></div>
+    <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light">
+    <tr><th>Empenho</th><th>SE</th><th class="text-center">Itens</th><th class="text-end">Valor Total</th><th class="text-end">IR</th><th class="text-end">Valor Liquido</th></tr></thead><tbody>`;
+    for(let eid in byEmp){
+      let e=emps.find(x=>x.id==eid);
+      let d=byEmp[eid];
+      html+=`<tr><td><strong>${e?e.number+'/'+e.year:'-'}</strong></td><td><span class="badge bg-primary">SE ${e?e.se:'-'}</span></td>
+      <td class="text-center">${d.items.length}</td><td class="text-end">${brl(d.tot)}</td><td class="text-end text-danger">${brl(d.ir)}</td><td class="text-end fw-bold">${brl(d.liq)}</td></tr>`;
+    }
+    html+=`</tbody><tfoot class="table-light"><tr class="fw-bold"><td colspan="3">TOTAL</td><td class="text-end">${brl0(tot)}</td><td class="text-end text-danger">${brl0(ir)}</td><td class="text-end">${brl0(liq)}</td></tr></tfoot></table></div></div></div>`;
+  }
+
+  // Items table
+  html+=`<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+  <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Itens de Servico</h6>
+  <button class="btn btn-primary btn-sm no-print" onclick="openAddItem(${compId})"><i class="bi bi-plus me-1"></i>Novo</button></div>
+  <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0" style="font-size:.85rem">
+  <thead class="table-light"><tr><th>Produto</th><th>Servico</th><th>Periodo</th><th class="text-end">Val.Unit.</th><th class="text-center">Qtd</th><th class="text-end">Val.Total</th><th class="text-end">IR</th><th class="text-end">Val.Liq.</th><th>Empenho</th><th class="text-center no-print">Acoes</th></tr></thead>
+  <tbody>${items.map(i=>{
+    let e=emps.find(x=>x.id===i.empId);
+    return`<tr><td><small class="text-muted">${i.produto}</small></td><td>${i.servico}</td><td><small>${i.periodo||'-'}</small></td>
+    <td class="text-end">${brl(i.valorUnit)}</td><td class="text-center">${i.qtd}</td><td class="text-end">${brl(i.valorTotal)}</td>
+    <td class="text-end text-danger">${brl(i.irValue)}</td><td class="text-end fw-bold">${brl(i.valorLiquido)}</td>
+    <td><span class="badge bg-light text-dark">${e?e.number+'/'+e.year:'-'}</span></td>
+    <td class="text-center no-print"><div class="btn-group btn-group-sm">
+    <button class="btn btn-outline-secondary" onclick="openEditItem(${i.id})"><i class="bi bi-pencil"></i></button>
+    <button class="btn btn-outline-danger" onclick="deleteItem(${i.id},${compId})"><i class="bi bi-trash"></i></button></div></td></tr>`;
+  }).join('')}${items.length===0?'<tr><td colspan="10" class="text-center py-4 text-muted">Nenhum item. Clique em "Adicionar Item".</td></tr>':''}</tbody></table></div></div></div>`;
+
+  document.getElementById('sec-comp-detail').innerHTML=html;
+}
+
+// ==================== ADD/EDIT ITEMS ====================
+function openAddItem(compId){
+  const data=loadData();
+  const emps=data.empenhos;
+  document.getElementById('itemModalTitle').textContent='Adicionar Item de Servico';
+  document.getElementById('itemModalBody').innerHTML=`
+  <div class="mb-3"><label class="form-label fw-bold">Tipo de Servico (preenchimento rapido)</label>
+  <select class="form-select" id="stSelect" onchange="fillFromST()"><option value="">-- Selecione --</option>
+  ${SERVICE_TYPES.map((s,i)=>`<option value="${i}">${s.produto} - ${s.nome} (R$ ${s.valor.toFixed(2)})</option>`).join('')}</select></div><hr>
+  <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Produto</label><input type="text" class="form-control" id="itemProduto"></div>
+  <div class="col-md-6 mb-3"><label class="form-label">Empenho</label><select class="form-select" id="itemEmp">
+  ${emps.map(e=>`<option value="${e.id}" data-se="${e.se}">${e.number}/${e.year} - SE ${e.se} - ${e.desc}</option>`).join('')}</select></div></div>
+  <div class="row"><div class="col-md-8 mb-3"><label class="form-label">Servico</label><input type="text" class="form-control" id="itemServico"></div>
+  <div class="col-md-4 mb-3"><label class="form-label">Periodo</label><input type="text" class="form-control" id="itemPeriodo" placeholder="Ex: 01/03 a 31/03"></div></div>
+  <div class="row"><div class="col-md-4 mb-3"><label class="form-label">Valor Unitario (R$)</label><input type="number" step="0.01" class="form-control" id="itemUnit" oninput="calcItemPreview()"></div>
+  <div class="col-md-4 mb-3"><label class="form-label">Quantidade</label><input type="number" class="form-control" id="itemQtd" oninput="calcItemPreview()"></div>
+  <div class="col-md-4 mb-3"><label class="form-label">Valor Total</label><input type="text" class="form-control bg-light" id="itemTotPrev" readonly></div></div>
+  <div class="row"><div class="col-md-4 mb-3"><label class="form-label">IR (2,4%)</label><input type="text" class="form-control bg-light" id="itemIrPrev" readonly></div>
+  <div class="col-md-4 mb-3"><label class="form-label">Valor Liquido</label><input type="text" class="form-control bg-light" id="itemLiqPrev" readonly></div>
+  <div class="col-md-4 mb-3"><div class="form-check mt-4"><input type="checkbox" class="form-check-input" id="itemIrOn" checked onchange="calcItemPreview()"><label class="form-check-label">IR Aplicavel</label></div></div></div>`;
+  document.getElementById('itemModalSave').onclick=()=>saveItem(compId,null);
+  new bootstrap.Modal(document.getElementById('itemModal')).show();
+}
+
+function openEditItem(itemId){
+  const data=loadData();
+  const item=data.items.find(i=>i.id===itemId);
+  if(!item) return;
+  openAddItem(item.compId);
+  setTimeout(()=>{
+    document.getElementById('itemModalTitle').textContent='Editar Item';
+    document.getElementById('itemProduto').value=item.produto;
+    document.getElementById('itemServico').value=item.servico;
+    document.getElementById('itemPeriodo').value=item.periodo||'';
+    document.getElementById('itemUnit').value=item.valorUnit;
+    document.getElementById('itemQtd').value=item.qtd;
+    document.getElementById('itemEmp').value=item.empId;
+    document.getElementById('itemIrOn').checked=item.irOn!==false;
+    calcItemPreview();
+    document.getElementById('itemModalSave').onclick=()=>saveItem(item.compId,itemId);
+  },300);
+}
+
+function fillFromST(){
+  let idx=document.getElementById('stSelect').value;
+  if(idx==='') return;
+  let st=SERVICE_TYPES[parseInt(idx)];
+  document.getElementById('itemProduto').value=st.produto;
+  document.getElementById('itemServico').value=st.nome;
+  document.getElementById('itemUnit').value=st.valor;
+  // Auto-select empenho by SE
+  let empSel=document.getElementById('itemEmp');
+  for(let opt of empSel.options){if(opt.dataset.se===st.se){empSel.value=opt.value;break;}}
+  document.getElementById('itemQtd').focus();
+  calcItemPreview();
+}
+
+function calcItemPreview(){
+  let u=parseFloat(document.getElementById('itemUnit').value)||0;
+  let q=parseInt(document.getElementById('itemQtd').value)||0;
+  let irOn=document.getElementById('itemIrOn').checked;
+  let tot=u*q;
+  let ir=irOn?Math.round(tot*IR_RATE*100)/100:0;
+  document.getElementById('itemTotPrev').value=brl0(tot);
+  document.getElementById('itemIrPrev').value=brl0(ir);
+  document.getElementById('itemLiqPrev').value=brl0(tot-ir);
+}
+
+function saveItem(compId,editId){
+  let data=loadData();
+  let obj={
+    compId,empId:parseInt(document.getElementById('itemEmp').value),
+    produto:document.getElementById('itemProduto').value,
+    servico:document.getElementById('itemServico').value,
+    periodo:document.getElementById('itemPeriodo').value,
+    valorUnit:parseFloat(document.getElementById('itemUnit').value)||0,
+    qtd:parseInt(document.getElementById('itemQtd').value)||0,
+    irOn:document.getElementById('itemIrOn').checked
+  };
+  obj.valorTotal=obj.valorUnit*obj.qtd;
+  obj.irValue=obj.irOn?Math.round(obj.valorTotal*IR_RATE*100)/100:0;
+  obj.valorLiquido=obj.valorTotal-obj.irValue;
+
+  if(editId){
+    let idx=data.items.findIndex(i=>i.id===editId);
+    if(idx>=0){obj.id=editId;data.items[idx]=obj;}
+  }else{
+    obj.id=data.nextItemId++;
+    data.items.push(obj);
+  }
+  saveData(data);
+  bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
+  showSection('comp-detail',compId);
+}
+
+function deleteItem(itemId,compId){
+  if(!confirm('Remover este item?')) return;
+  let data=loadData();
+  data.items=data.items.filter(i=>i.id!==itemId);
+  saveData(data);
+  showSection('comp-detail',compId);
+}
+// ==================== EMPENHOS ====================
+function renderEmpenhos(){
+  const data=loadData();
+  const emps=data.empenhos;
+  let html=`<div class="d-flex justify-content-between align-items-center mb-4">
+  <div><h4 class="mb-1"><i class="bi bi-wallet2 me-2"></i>Empenhos</h4><p class="text-muted mb-0">Contrato 591/2025 - Gestao dos empenhos</p></div></div>`;
+
+  emps.forEach(e=>{
+    let items=empItems(data,e.id);
+    let exec=items.reduce((s,i)=>s+(i.valorTotal||0),0);
+    let irT=items.reduce((s,i)=>s+(i.irValue||0),0);
+    let liqT=items.reduce((s,i)=>s+(i.valorLiquido||0),0);
+    let tot=empTotal(e);let p=tot>0?(exec/tot*100):0;
+    let color=p>90?'danger':p>70?'warning':'success';
+
+    // Monthly breakdown
+    let monthly={};
+    items.forEach(i=>{
+      let c=data.competencias.find(x=>x.id===i.compId);
+      if(!c) return;
+      let key=c.year*100+c.month;
+      if(!monthly[key]) monthly[key]={label:MESES[c.month]+'/'+c.year,tot:0,ir:0,liq:0};
+      monthly[key].tot+=i.valorTotal||0;
+      monthly[key].ir+=i.irValue||0;
+      monthly[key].liq+=i.valorLiquido||0;
+    });
+    let sortedM=Object.keys(monthly).sort().map(k=>monthly[k]);
+
+    html+=`<div class="card border-0 shadow-sm mb-4 empenho-${e.se}">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <div><h5 class="mb-0">Empenho ${e.number}/${e.year} <span class="badge bg-primary ms-2">SE ${e.se}</span></h5>
+    <small class="text-muted">${e.desc}</small></div>
+    <div class="text-end"><p class="mb-0 small text-muted">Execucao</p><h5 class="mb-0 text-${color}">${pct(p)}</h5></div></div>
+    <div class="card-body">
+    <div class="progress mb-3" style="height:12px"><div class="progress-bar bg-${color}" style="width:${Math.min(p,100)}%"></div></div>
+    <div class="row text-center mb-3">
+    <div class="col-md-2"><p class="text-muted mb-0 small">Valor Inicial</p><p class="fw-bold mb-0">${brl0(e.initial)}</p></div>
+    <div class="col-md-2"><p class="text-muted mb-0 small">Reforco</p><p class="fw-bold text-info mb-0">${brl0(e.reinforcement)}</p></div>
+    <div class="col-md-2"><p class="text-muted mb-0 small">Anulacao</p><p class="fw-bold text-danger mb-0">${brl0(e.annulment)}</p></div>
+    <div class="col-md-2"><p class="text-muted mb-0 small">Empenhado</p><p class="fw-bold text-primary mb-0">${brl0(tot)}</p></div>
+    <div class="col-md-2"><p class="text-muted mb-0 small">Executado</p><p class="fw-bold text-success mb-0">${brl0(exec)}</p></div>
+    <div class="col-md-2"><p class="text-muted mb-0 small">Saldo</p><p class="fw-bold ${tot-exec>=0?'text-info':'text-danger'} mb-0">${brl0(tot-exec)}</p></div></div>
+    <button class="btn btn-outline-primary btn-sm mb-3 no-print" onclick="openEditEmp(${e.id})"><i class="bi bi-pencil me-1"></i>Editar Valores</button>`;
+
+    if(sortedM.length>0){
+      html+=`<h6><i class="bi bi-calendar3 me-2"></i>Execucao Mensal</h6>
+      <div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.85rem">
+      <thead class="table-light"><tr><th>Competencia</th><th class="text-end">Valor Total</th><th class="text-end">IR</th><th class="text-end">Liquido</th></tr></thead>
+      <tbody>${sortedM.map(m=>`<tr><td>${m.label}</td><td class="text-end">${brl(m.tot)}</td><td class="text-end text-danger">${brl(m.ir)}</td><td class="text-end fw-bold">${brl(m.liq)}</td></tr>`).join('')}</tbody>
+      <tfoot class="table-light"><tr class="fw-bold"><td>TOTAL</td><td class="text-end">${brl0(exec)}</td><td class="text-end text-danger">${brl0(irT)}</td><td class="text-end">${brl0(liqT)}</td></tr></tfoot></table></div>`;
+    }else{html+=`<p class="text-muted small">Nenhuma execucao registrada.</p>`;}
+    html+=`</div></div>`;
+  });
+  document.getElementById('sec-empenhos').innerHTML=html;
+}
+
+function openEditEmp(empId){
+  const data=loadData();
+  const e=data.empenhos.find(x=>x.id===empId);
+  document.getElementById('empModalBody').innerHTML=`
+  <div class="mb-3"><label class="form-label">Valor Inicial (R$)</label><input type="number" step="0.01" class="form-control" id="empInit" value="${e.initial||0}"></div>
+  <div class="mb-3"><label class="form-label">Reforco (R$)</label><input type="number" step="0.01" class="form-control" id="empReinf" value="${e.reinforcement||0}"></div>
+  <div class="mb-3"><label class="form-label">Anulacao (R$)</label><input type="number" step="0.01" class="form-control" id="empAnnul" value="${e.annulment||0}"></div>`;
+  document.getElementById('empModalSave').onclick=()=>{
+    let data=loadData();
+    let emp=data.empenhos.find(x=>x.id===empId);
+    emp.initial=parseFloat(document.getElementById('empInit').value)||0;
+    emp.reinforcement=parseFloat(document.getElementById('empReinf').value)||0;
+    emp.annulment=parseFloat(document.getElementById('empAnnul').value)||0;
+    saveData(data);
+    bootstrap.Modal.getInstance(document.getElementById('empModal')).hide();
+    renderEmpenhos();
+  };
+  new bootstrap.Modal(document.getElementById('empModal')).show();
+}
+
+// ==================== ACOMPANHAMENTO ====================
+function renderAcompanhamento(){
+  const data=loadData();
+  const emps=data.empenhos;
+  let comps=[...data.competencias].sort((a,b)=>a.year-b.year||a.month-b.month);
+  let running={};emps.forEach(e=>running[e.id]=0);
+  let grandRun=0;
+
+  let rows=comps.map(c=>{
+    let items=compItems(data,c.id);
+    let row={comp:c,emps:{},tot:0,ir:0,liq:0};
+    emps.forEach(e=>{
+      let eItems=items.filter(i=>i.empId===e.id);
+      let v=eItems.reduce((s,i)=>s+(i.valorTotal||0),0);
+      running[e.id]+=v;
+      row.emps[e.id]={val:v,acc:running[e.id]};
+    });
+    row.tot=items.reduce((s,i)=>s+(i.valorTotal||0),0);
+    row.ir=items.reduce((s,i)=>s+(i.irValue||0),0);
+    row.liq=items.reduce((s,i)=>s+(i.valorLiquido||0),0);
+    grandRun+=row.tot;
+    row.acc=grandRun;
+    return row;
+  });
+
+  let html=`<div class="d-flex justify-content-between align-items-center mb-4">
+  <div><h4 class="mb-1"><i class="bi bi-graph-up me-2"></i>Acompanhamento Contratual</h4><p class="text-muted mb-0">Contrato 591/2025 - Banco do Brasil S.A.</p></div>
+  <button class="btn btn-outline-danger no-print" onclick="window.print()"><i class="bi bi-file-pdf me-1"></i>Imprimir/PDF</button></div>
+  <div class="row mb-4">${emps.map(e=>{
+    let exec=running[e.id]||0;let tot=empTotal(e);let p=tot>0?(exec/tot*100):0;let color=p>90?'danger':p>70?'warning':'success';
+    return`<div class="col-lg-4 mb-3"><div class="card border-0 shadow-sm empenho-${e.se}"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0">${e.number}/${e.year} <span class="badge bg-primary">SE ${e.se}</span></h6>
+    <span class="fw-bold text-${color}">${pct(p)}</span></div>
+    <div class="progress mb-2" style="height:8px"><div class="progress-bar bg-${color}" style="width:${Math.min(p,100)}%"></div></div>
+    <div class="row text-center small"><div class="col-4"><span class="text-muted d-block">Empenhado</span><strong>${brl0(tot)}</strong></div>
+    <div class="col-4"><span class="text-muted d-block">Executado</span><strong class="text-success">${brl0(exec)}</strong></div>
+    <div class="col-4"><span class="text-muted d-block">Saldo</span><strong class="${tot-exec>=0?'text-info':'text-danger'}">${brl0(tot-exec)}</strong></div></div></div></div></div>`;
+  }).join('')}</div>
+  <div class="card border-0 shadow-sm"><div class="card-header bg-white border-0"><h6 class="mb-0"><i class="bi bi-table me-2"></i>Matriz de Execucao</h6></div>
+  <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0 matrix-table">
+  <thead class="table-light"><tr><th>Competencia</th>${emps.map(e=>`<th class="text-end">NE ${e.number}<br><small>SE ${e.se}</small></th>`).join('')}
+  <th class="text-end">Total Bruto</th><th class="text-end">IR</th><th class="text-end">Liquido</th><th class="text-end">Acumulado</th></tr></thead>
+  <tbody>${rows.map(r=>`<tr><td><strong>${MESES[r.comp.month]}/${r.comp.year}</strong></td>
+  ${emps.map(e=>`<td class="text-end">${brl(r.emps[e.id].val)}</td>`).join('')}
+  <td class="text-end">${brl(r.tot)}</td><td class="text-end text-danger">${brl(r.ir)}</td><td class="text-end">${brl(r.liq)}</td>
+  <td class="text-end fw-bold">${brl(r.acc)}</td></tr>`).join('')}
+  ${rows.length===0?`<tr><td colspan="${emps.length+5}" class="text-center py-4 text-muted">Nenhuma competencia.</td></tr>`:''}</tbody>
+  ${rows.length>0?`<tfoot class="table-light"><tr class="fw-bold"><td>TOTAL EXECUTADO</td>
+  ${emps.map(e=>`<td class="text-end">${brl0(running[e.id])}</td>`).join('')}
+  <td class="text-end">${brl0(grandRun)}</td><td class="text-end text-danger">${brl0(rows.reduce((s,r)=>s+r.ir,0))}</td>
+  <td class="text-end">${brl0(rows.reduce((s,r)=>s+r.liq,0))}</td><td class="text-end">${brl0(grandRun)}</td></tr>
+  <tr class="fw-bold" style="background:#fff3cd"><td>SALDO</td>
+  ${emps.map(e=>`<td class="text-end">${brl0(empTotal(e)-running[e.id])}</td>`).join('')}
+  <td class="text-end" colspan="4">${brl0(emps.reduce((s,e)=>s+empTotal(e),0)-grandRun)}</td></tr></tfoot>`:''}
+  </table></div></div></div>
+  <p class="text-muted small mt-2"><strong>Base Legal:</strong> IR retido conforme Tema 1130 STF e IN RFB 1.234/2012. Aliquota IRRF: 2,4%.</p>`;
+  document.getElementById('sec-acompanhamento').innerHTML=html;
+}
+
+// ==================== PDF PRINT ====================
+function printCompPdf(compId){
+  currentCompId=compId;
+  showSection('comp-detail',compId);
+  setTimeout(()=>window.print(),300);
+}
+
+// ==================== INIT ====================
+showSection('dashboard');
+</script>
+</body>
+</html>

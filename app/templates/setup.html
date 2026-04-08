@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Configuracao Inicial - SEMFAZ{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-gear-fill me-2"></i>Configuracao Inicial do Contrato</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('setup') }}">
+                    <!-- Contract Info -->
+                    <h5 class="border-bottom pb-2 mb-3">
+                        <i class="bi bi-file-text me-2"></i>Dados do Contrato
+                    </h5>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Numero do Contrato</label>
+                            <input type="text" class="form-control" name="number" value="591" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Ano</label>
+                            <input type="number" class="form-control" name="year" value="2025" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Contratada</label>
+                            <input type="text" class="form-control" name="contractor"
+                                   value="Banco do Brasil S.A." required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">CNPJ</label>
+                            <input type="text" class="form-control" name="cnpj"
+                                   value="00.000.000/0001-91">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Data Inicio</label>
+                            <input type="date" class="form-control" name="start_date">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Data Fim</label>
+                            <input type="date" class="form-control" name="end_date">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Objeto</label>
+                            <textarea class="form-control" name="object_description" rows="2"
+                                >Prestacao de servicos financeiros ao Municipio, incluindo arrecadacao de tributos, processamento de folha de pagamento e servicos bancarios diversos.</textarea>
+                        </div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">Valor Global do Contrato (R$)</label>
+                            <input type="text" class="form-control" name="total_value"
+                                   placeholder="0,00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Estimativa Mensal (R$)</label>
+                            <input type="text" class="form-control" name="monthly_estimate"
+                                   placeholder="0,00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Descricao</label>
+                            <input type="text" class="form-control" name="description"
+                                   value="Servicos Financeiros - Banco do Brasil">
+                        </div>
+                    </div>
+
+                    <!-- Empenhos -->
+                    <h5 class="border-bottom pb-2 mb-3">
+                        <i class="bi bi-wallet2 me-2"></i>Empenhos (ate 3)
+                    </h5>
+
+                    <!-- Empenho 1 - SubElemento 98 -->
+                    <div class="card mb-3 border-info">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <strong>Empenho 1 - SubElemento 98 (Servicos Bancarios / Recebimentos)</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <label class="form-label">Numero</label>
+                                    <input type="text" class="form-control" name="emp_number_1"
+                                           placeholder="268" value="268">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Ano</label>
+                                    <input type="number" class="form-control" name="emp_year_1"
+                                           value="2026">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">SubElemento</label>
+                                    <input type="text" class="form-control" name="emp_sub_1"
+                                           value="98">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Valor Empenhado (R$)</label>
+                                    <input type="text" class="form-control" name="emp_value_1"
+                                           placeholder="0,00">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Descricao</label>
+                                    <input type="text" class="form-control" name="emp_desc_1"
+                                           value="Servicos Bancarios - Recebimentos">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empenho 2 - SubElemento 93 -->
+                    <div class="card mb-3 border-success">
+                        <div class="card-header bg-success bg-opacity-10">
+                            <strong>Empenho 2 - SubElemento 93 (Folha de Pagamento)</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <label class="form-label">Numero</label>
+                                    <input type="text" class="form-control" name="emp_number_2"
+                                           placeholder="270" value="270">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Ano</label>
+                                    <input type="number" class="form-control" name="emp_year_2"
+                                           value="2026">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">SubElemento</label>
+                                    <input type="text" class="form-control" name="emp_sub_2"
+                                           value="93">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Valor Empenhado (R$)</label>
+                                    <input type="text" class="form-control" name="emp_value_2"
+                                           placeholder="0,00">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Descricao</label>
+                                    <input type="text" class="form-control" name="emp_desc_2"
+                                           value="Folha de Pagamento">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empenho 3 - SubElemento 92 -->
+                    <div class="card mb-3 border-warning">
+                        <div class="card-header bg-warning bg-opacity-10">
+                            <strong>Empenho 3 - SubElemento 92 (Pagamentos Diversos)</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <label class="form-label">Numero</label>
+                                    <input type="text" class="form-control" name="emp_number_3"
+                                           placeholder="271" value="271">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Ano</label>
+                                    <input type="number" class="form-control" name="emp_year_3"
+                                           value="2026">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">SubElemento</label>
+                                    <input type="text" class="form-control" name="emp_sub_3"
+                                           value="92">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Valor Empenhado (R$)</label>
+                                    <input type="text" class="form-control" name="emp_value_3"
+                                           placeholder="0,00">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Descricao</label>
+                                    <input type="text" class="form-control" name="emp_desc_3"
+                                           value="Pagamentos Diversos">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-circle me-2"></i>Configurar Contrato
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
