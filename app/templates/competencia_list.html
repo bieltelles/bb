@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Competencias - SEMFAZ{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1"><i class="bi bi-calendar-month me-2"></i>Competencias</h4>
+        <p class="text-muted mb-0">Gerenciamento mensal da liquidacao de despesas</p>
+    </div>
+    <a href="{{ url_for('competencia_new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> Nova Competencia
+    </a>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm text-center">
+            <div class="card-body">
+                <h2 class="text-primary mb-0">{{ competencias|length }}</h2>
+                <small class="text-muted">Total de Competencias</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm text-center">
+            <div class="card-body">
+                {% set total = competencias|map(attribute='valor_total')|sum %}
+                <h5 class="text-success mb-0">{{ total|brl_always }}</h5>
+                <small class="text-muted">Valor Total Executado</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm text-center">
+            <div class="card-body">
+                {% set liquidados = competencias|selectattr('status', 'equalto', 'LIQUIDADO')|list|length %}
+                {% set pagos = competencias|selectattr('status', 'equalto', 'PAGO')|list|length %}
+                <h2 class="text-info mb-0">{{ liquidados + pagos }}</h2>
+                <small class="text-muted">Liquidados/Pagos</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm text-center">
+            <div class="card-body">
+                {% set pendentes = competencias|selectattr('status', 'equalto', 'PENDENTE')|list|length %}
+                {% set em_analise = competencias|selectattr('status', 'equalto', 'EM ANÁLISE')|list|length %}
+                <h2 class="text-warning mb-0">{{ pendentes + em_analise }}</h2>
+                <small class="text-muted">Pendentes/Em Analise</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Competencias Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Competencia</th>
+                        <th>Oficio</th>
+                        <th>Data Oficio</th>
+                        <th>Status</th>
+                        <th class="text-center">Itens</th>
+                        <th class="text-end">Valor Total</th>
+                        <th class="text-end">IR Retido</th>
+                        <th class="text-end">Valor Liquido</th>
+                        <th class="text-center">Acoes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comp in competencias %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('competencia_detail', id=comp.id) }}"
+                               class="text-decoration-none fw-bold">
+                                {{ comp.display_name }}
+                            </a>
+                        </td>
+                        <td>{{ comp.oficio_number or '-' }}</td>
+                        <td>{{ comp.oficio_date.strftime('%d/%m/%Y') if comp.oficio_date else '-' }}</td>
+                        <td>
+                            <span class="badge
+                                {% if comp.status == 'PAGO' %}bg-success
+                                {% elif comp.status == 'LIQUIDADO' %}bg-info
+                                {% elif comp.status == 'EM ANÁLISE' %}bg-warning
+                                {% else %}bg-secondary{% endif %}">
+                                {{ comp.status }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark">{{ comp.items|length }}</span>
+                        </td>
+                        <td class="text-end">{{ comp.valor_total|brl }}</td>
+                        <td class="text-end text-danger">{{ comp.total_ir|brl }}</td>
+                        <td class="text-end fw-bold">{{ comp.total_liquido|brl }}</td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('competencia_detail', id=comp.id) }}"
+                                   class="btn btn-outline-primary" title="Detalhes">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('competencia_edit', id=comp.id) }}"
+                                   class="btn btn-outline-secondary" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('monthly_report_pdf', id=comp.id) }}"
+                                   class="btn btn-outline-danger" target="_blank" title="PDF">
+                                    <i class="bi bi-file-pdf"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not competencias %}
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox display-6 d-block mb-2"></i>
+                            Nenhuma competencia cadastrada ainda.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

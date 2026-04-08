@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Acompanhamento Contratual - {{ contract.display_name }}</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 1cm;
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 8pt;
+            color: #333;
+            line-height: 1.3;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #003366;
+            padding-bottom: 8px;
+        }
+        .header h1 {
+            font-size: 12pt;
+            color: #003366;
+            margin: 0;
+        }
+        .header h2 {
+            font-size: 10pt;
+            color: #003366;
+            margin: 2px 0;
+        }
+        .header p {
+            font-size: 8pt;
+            margin: 2px 0;
+            color: #555;
+        }
+        .section-title {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #003366;
+            border-bottom: 1px solid #003366;
+            padding-bottom: 2px;
+            margin: 10px 0 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
+        th, td {
+            border: 1px solid #999;
+            padding: 3px 4px;
+            font-size: 7.5pt;
+        }
+        th {
+            background-color: #003366;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        td {
+            text-align: right;
+        }
+        td:first-child {
+            text-align: left;
+        }
+        .subtotal td {
+            background-color: #e0e0e0;
+            font-weight: bold;
+        }
+        .total td {
+            background-color: #003366;
+            color: white;
+            font-weight: bold;
+        }
+        .saldo td {
+            background-color: #ffc107;
+            color: #333;
+            font-weight: bold;
+        }
+        .info-row {
+            margin-bottom: 3px;
+        }
+        .info-row td {
+            border: none;
+            padding: 1px 4px;
+            text-align: left;
+        }
+        .info-row .label {
+            font-weight: bold;
+            color: #003366;
+            width: 20%;
+        }
+        .signatures {
+            margin-top: 30px;
+        }
+        .signatures td {
+            border: none;
+            text-align: center;
+            padding-top: 30px;
+            font-size: 8pt;
+            width: 50%;
+        }
+        .signatures .line {
+            border-top: 1px solid #333;
+            display: inline-block;
+            width: 70%;
+            margin-bottom: 2px;
+        }
+        .footer {
+            text-align: center;
+            font-size: 6pt;
+            color: #999;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>PREFEITURA MUNICIPAL DE SAO LUIS</h1>
+        <h2>SECRETARIA MUNICIPAL DE FAZENDA - SEMFAZ</h2>
+        <p><strong>ACOMPANHAMENTO DA EXECUCAO CONTRATUAL</strong></p>
+    </div>
+
+    <!-- Contract Info -->
+    <table class="info-row">
+        <tr>
+            <td class="label">Contrato:</td>
+            <td>No {{ contract.number }}/{{ contract.year }}</td>
+            <td class="label">Contratada:</td>
+            <td>{{ contract.contractor }}</td>
+        </tr>
+        <tr>
+            <td class="label">Objeto:</td>
+            <td colspan="3">{{ contract.object_description or 'Prestacao de servicos financeiros' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Vigencia:</td>
+            <td>{% if contract.start_date %}{{ contract.start_date.strftime('%d/%m/%Y') }}{% endif %}
+                {% if contract.end_date %} a {{ contract.end_date.strftime('%d/%m/%Y') }}{% endif %}</td>
+            <td class="label">Valor Global:</td>
+            <td>{{ contract.total_value|brl_always }}</td>
+        </tr>
+    </table>
+
+    <!-- Empenho Summary -->
+    <div class="section-title">Situacao dos Empenhos</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Empenho</th>
+                <th>SubElemento</th>
+                <th>Descricao</th>
+                <th>Valor Empenhado</th>
+                <th>Executado</th>
+                <th>IR Retido</th>
+                <th>Liquido</th>
+                <th>Saldo</th>
+                <th>% Exec.</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(total_emp=0, total_exec=0, total_ir=0, total_liq=0, total_saldo=0) %}
+            {% for emp in empenhos %}
+            {% set ns.total_emp = ns.total_emp + emp.total_value %}
+            {% set ns.total_exec = ns.total_exec + emp.total_executed %}
+            {% set ns.total_ir = ns.total_ir + emp.total_ir %}
+            {% set ns.total_liq = ns.total_liq + emp.total_liquido %}
+            {% set ns.total_saldo = ns.total_saldo + emp.balance %}
+            <tr>
+                <td>{{ emp.display_number }}</td>
+                <td style="text-align:center">{{ emp.sub_elemento }}</td>
+                <td style="text-align:left">{{ emp.description }}</td>
+                <td>{{ emp.total_value|brl_always }}</td>
+                <td>{{ emp.total_executed|brl_always }}</td>
+                <td>{{ emp.total_ir|brl_always }}</td>
+                <td>{{ emp.total_liquido|brl_always }}</td>
+                <td>{{ emp.balance|brl_always }}</td>
+                <td style="text-align:center">{{ emp.execution_percentage|pct }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="subtotal">
+                <td colspan="3" style="text-align:left">TOTAL</td>
+                <td>{{ ns.total_emp|brl_always }}</td>
+                <td>{{ ns.total_exec|brl_always }}</td>
+                <td>{{ ns.total_ir|brl_always }}</td>
+                <td>{{ ns.total_liq|brl_always }}</td>
+                <td>{{ ns.total_saldo|brl_always }}</td>
+                <td style="text-align:center">
+                    {% if ns.total_emp > 0 %}{{ ((ns.total_exec / ns.total_emp) * 100)|pct }}{% else %}0,00%{% endif %}
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Execution Matrix -->
+    <div class="section-title">Execucao Mensal por Empenho</div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:12%">Competencia</th>
+                {% for emp in empenhos %}
+                <th>NE {{ emp.number }} (SE {{ emp.sub_elemento }})</th>
+                {% endfor %}
+                <th>Total Bruto</th>
+                <th>IR (2,4%)</th>
+                <th>Valor Liquido</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in matrix %}
+            <tr>
+                <td>{{ row.competencia.display_name }}</td>
+                {% for emp in empenhos %}
+                <td>{{ row.empenhos[emp.id].valor|brl }}</td>
+                {% endfor %}
+                <td>{{ row.total|brl }}</td>
+                <td>{{ row.total_ir|brl }}</td>
+                <td>{{ row.total_liquido|brl }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        {% if matrix %}
+        <tfoot>
+            <tr class="total">
+                <td style="text-align:left; color:white;">TOTAL</td>
+                {% for emp in empenhos %}
+                <td style="color:white;">{{ running_totals[emp.id]|brl_always }}</td>
+                {% endfor %}
+                <td style="color:white;">{{ ns.total_exec|brl_always }}</td>
+                <td style="color:white;">{{ ns.total_ir|brl_always }}</td>
+                <td style="color:white;">{{ ns.total_liq|brl_always }}</td>
+            </tr>
+            <tr class="saldo">
+                <td style="text-align:left;">SALDO</td>
+                {% for emp in empenhos %}
+                <td>{{ (emp.total_value - running_totals[emp.id])|brl_always }}</td>
+                {% endfor %}
+                <td colspan="3">{{ ns.total_saldo|brl_always }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+
+    <p style="font-size:7pt; color:#666;">
+        Base Legal: IR retido conforme Tema 1130 STF e IN RFB 1.234/2012. Aliquota IRRF: 2,4%.
+    </p>
+
+    <!-- Signatures -->
+    <table class="signatures">
+        <tr>
+            <td>
+                <div class="line"></div><br>
+                Fiscal do Contrato<br>
+                <small>SEMFAZ - Sao Luis/MA</small>
+            </td>
+            <td>
+                <div class="line"></div><br>
+                Gestor do Contrato<br>
+                <small>SEMFAZ - Sao Luis/MA</small>
+            </td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        Gerado em {{ generation_date.strftime('%d/%m/%Y') }} | SEMFAZ - Sistema de Acompanhamento Contratual | Contrato {{ contract.number }}/{{ contract.year }}
+    </div>
+</body>
+</html>

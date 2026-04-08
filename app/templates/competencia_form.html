@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}
+    {% if competencia %}Editar{% else %}Nova{% endif %} Competencia - SEMFAZ
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-plus me-2"></i>
+                    {% if competencia %}
+                        Editar Competencia - {{ competencia.display_name }}
+                    {% else %}
+                        Nova Competencia
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST"
+                      action="{% if competencia %}{{ url_for('competencia_edit', id=competencia.id) }}{% else %}{{ url_for('competencia_new') }}{% endif %}">
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Mes</label>
+                            <select class="form-select" name="month" {% if competencia %}disabled{% endif %}>
+                                {% for num, nome in meses.items() %}
+                                <option value="{{ num }}"
+                                    {% if competencia and competencia.month == num %}selected
+                                    {% elif not competencia and num == now.month %}selected{% endif %}>
+                                    {{ nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ano</label>
+                            <input type="number" class="form-control" name="year"
+                                   value="{{ competencia.year if competencia else now.year }}"
+                                   {% if competencia %}readonly{% endif %}>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                {% for s in status_list %}
+                                <option value="{{ s }}"
+                                    {% if competencia and competencia.status == s %}selected{% endif %}>
+                                    {{ s }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Numero do Oficio</label>
+                            <input type="text" class="form-control" name="oficio_number"
+                                   value="{{ competencia.oficio_number if competencia else '' }}"
+                                   placeholder="Ex: OF. 001/2026">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Data do Oficio</label>
+                            <input type="date" class="form-control" name="oficio_date"
+                                   value="{{ competencia.oficio_date.strftime('%Y-%m-%d') if competencia and competencia.oficio_date else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Data de Recebimento</label>
+                            <input type="date" class="form-control" name="data_recebimento"
+                                   value="{{ competencia.data_recebimento.strftime('%Y-%m-%d') if competencia and competencia.data_recebimento else '' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Observacoes</label>
+                        <textarea class="form-control" name="observacoes" rows="3"
+                            >{{ competencia.observacoes if competencia else '' }}</textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i>
+                            {% if competencia %}Atualizar{% else %}Criar Competencia{% endif %}
+                        </button>
+                        <a href="{% if competencia %}{{ url_for('competencia_detail', id=competencia.id) }}{% else %}{{ url_for('competencia_list') }}{% endif %}"
+                           class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% block title %}{{ competencia.display_name }} - SEMFAZ{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-1">
+            <i class="bi bi-calendar-check me-2"></i>{{ competencia.display_name }}
+        </h4>
+        <p class="text-muted mb-0">
+            Oficio: {{ competencia.oficio_number or 'N/A' }}
+            {% if competencia.oficio_date %} | Data: {{ competencia.oficio_date.strftime('%d/%m/%Y') }}{% endif %}
+            <span class="badge ms-2
+                {% if competencia.status == 'PAGO' %}bg-success
+                {% elif competencia.status == 'LIQUIDADO' %}bg-info
+                {% elif competencia.status == 'EM ANÁLISE' %}bg-warning
+                {% else %}bg-secondary{% endif %}">
+                {{ competencia.status }}
+            </span>
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('competencia_edit', id=competencia.id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Editar
+        </a>
+        <a href="{{ url_for('monthly_report_pdf', id=competencia.id) }}" class="btn btn-outline-danger btn-sm" target="_blank">
+            <i class="bi bi-file-pdf me-1"></i>PDF
+        </a>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">
+            <i class="bi bi-plus-circle me-1"></i>Adicionar Item
+        </button>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-2">
+        <div class="card border-0 shadow-sm summary-card border-primary">
+            <div class="card-body py-3">
+                <p class="text-muted mb-0 small">Valor Total Bruto</p>
+                <h5 class="mb-0 text-primary">{{ competencia.valor_total|brl_always }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-2">
+        <div class="card border-0 shadow-sm summary-card border-warning">
+            <div class="card-body py-3">
+                <p class="text-muted mb-0 small">IR Retido (2,4%)</p>
+                <h5 class="mb-0 text-warning">{{ competencia.total_ir|brl_always }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-2">
+        <div class="card border-0 shadow-sm summary-card border-success">
+            <div class="card-body py-3">
+                <p class="text-muted mb-0 small">Valor Liquido</p>
+                <h5 class="mb-0 text-success">{{ competencia.total_liquido|brl_always }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-2">
+        <div class="card border-0 shadow-sm summary-card border-info">
+            <div class="card-body py-3">
+                <p class="text-muted mb-0 small">Itens Lancados</p>
+                <h5 class="mb-0 text-info">{{ competencia.items|length }}</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary by Empenho -->
+{% if summary_by_empenho %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0">
+        <h6 class="mb-0"><i class="bi bi-wallet2 me-2"></i>Resumo por Empenho</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Empenho</th>
+                        <th>SubElemento</th>
+                        <th>Descricao</th>
+                        <th class="text-center">Itens</th>
+                        <th class="text-end">Valor Total</th>
+                        <th class="text-end">IR Retido</th>
+                        <th class="text-end">Valor Liquido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp_id, data in summary_by_empenho.items() %}
+                    <tr>
+                        <td><strong>{{ data.empenho.display_number }}</strong></td>
+                        <td><span class="badge bg-primary">SE {{ data.empenho.sub_elemento }}</span></td>
+                        <td>{{ data.empenho.description }}</td>
+                        <td class="text-center">{{ data.service_items|length }}</td>
+                        <td class="text-end">{{ data.valor_total|brl }}</td>
+                        <td class="text-end text-danger">{{ data.total_ir|brl }}</td>
+                        <td class="text-end fw-bold">{{ data.total_liquido|brl }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light">
+                    <tr class="fw-bold">
+                        <td colspan="4">TOTAL GERAL</td>
+                        <td class="text-end">{{ competencia.valor_total|brl_always }}</td>
+                        <td class="text-end text-danger">{{ competencia.total_ir|brl_always }}</td>
+                        <td class="text-end">{{ competencia.total_liquido|brl_always }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Items Table -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Itens de Servico</h6>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">
+            <i class="bi bi-plus me-1"></i>Novo Item
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" style="font-size: 0.85rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Produto</th>
+                        <th>Servico</th>
+                        <th>Periodo</th>
+                        <th class="text-end">Valor Unit.</th>
+                        <th class="text-center">Qtd</th>
+                        <th class="text-end">Valor Total</th>
+                        <th class="text-end">IR</th>
+                        <th class="text-end">Valor Liq.</th>
+                        <th>Empenho</th>
+                        <th class="text-center">Acoes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in competencia.items %}
+                    <tr>
+                        <td><small class="text-muted">{{ item.produto }}</small></td>
+                        <td>{{ item.servico }}</td>
+                        <td><small>{{ item.data_evento or '-' }}</small></td>
+                        <td class="text-end">{{ item.valor_unitario|brl }}</td>
+                        <td class="text-center">{{ item.quantidade }}</td>
+                        <td class="text-end">{{ item.valor_total|brl }}</td>
+                        <td class="text-end text-danger">{{ item.ir_value|brl }}</td>
+                        <td class="text-end fw-bold">{{ item.valor_liquido|brl }}</td>
+                        <td><span class="badge bg-light text-dark">{{ item.empenho.display_number }}</span></td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary btn-edit-item"
+                                    data-id="{{ item.id }}"
+                                    data-empenho="{{ item.empenho_id }}"
+                                    data-evento="{{ item.data_evento or '' }}"
+                                    data-produto="{{ item.produto }}"
+                                    data-servico="{{ item.servico }}"
+                                    data-contrato="{{ item.valor_contrato or '' }}"
+                                    data-unitario="{{ item.valor_unitario }}"
+                                    data-quantidade="{{ item.quantidade }}"
+                                    data-ir-applicable="{{ 'on' if item.ir_applicable else '' }}"
+                                    data-ir-rate="{{ (item.ir_rate * 100)|round(1) }}"
+                                    data-debitado="{{ item.debitado }}"
+                                    data-bs-toggle="modal" data-bs-target="#editItemModal">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="POST" action="{{ url_for('delete_service_item', id=competencia.id, item_id=item.id) }}"
+                                      onsubmit="return confirm('Remover este item?');" style="display:inline;">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not competencia.items %}
+                    <tr>
+                        <td colspan="10" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox display-6 d-block mb-2"></i>
+                            Nenhum item lancado. Clique em "Adicionar Item" para comecar.
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Adicionar Item de Servico</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_service_item', id=competencia.id) }}">
+                <div class="modal-body">
+                    <!-- Service Type Quick Select -->
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Servico (preenchimento rapido)</label>
+                        <select class="form-select" id="serviceTypeSelect">
+                            <option value="">-- Selecione um tipo de servico --</option>
+                            {% for st in service_types %}
+                            <option value="{{ st.id }}"
+                                    data-sub="{{ st.sub_elemento }}">
+                                {{ st.produto }} - {{ st.nome }} (R$ {{ '%.2f'|format(st.valor_unitario_padrao) }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Produto</label>
+                            <select class="form-select" name="produto" id="addProduto" required>
+                                <option value="">Selecione...</option>
+                                {% for p in produtos %}
+                                <option value="{{ p }}">{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Empenho</label>
+                            <select class="form-select" name="empenho_id" id="addEmpenho" required>
+                                {% for emp in empenhos %}
+                                <option value="{{ emp.id }}" data-sub="{{ emp.sub_elemento }}">
+                                    {{ emp.display_number }} - SE {{ emp.sub_elemento }} - {{ emp.description }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Nome do Servico</label>
+                            <input type="text" class="form-control" name="servico" id="addServico" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Periodo do Evento</label>
+                            <input type="text" class="form-control" name="data_evento" id="addEvento"
+                                   placeholder="Ex: 01/03 a 31/03/2026">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Valor Contrato</label>
+                            <input type="text" class="form-control" name="valor_contrato" id="addContrato">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Valor Unitario (R$)</label>
+                            <input type="text" class="form-control" name="valor_unitario" id="addUnitario"
+                                   required oninput="calcPreview()">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" class="form-control" name="quantidade" id="addQtd"
+                                   min="0" required oninput="calcPreview()">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Valor Total</label>
+                            <input type="text" class="form-control bg-light" id="addTotalPreview" readonly>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" name="ir_applicable"
+                                       id="addIrApplicable" checked oninput="calcPreview()">
+                                <label class="form-check-label" for="addIrApplicable">IR Aplicavel</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Aliquota IR (%)</label>
+                            <input type="text" class="form-control" name="ir_rate" id="addIrRate"
+                                   value="2.4" oninput="calcPreview()">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">IR Retido</label>
+                            <input type="text" class="form-control bg-light" id="addIrPreview" readonly>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Valor Liquido</label>
+                            <input type="text" class="form-control bg-light" id="addLiqPreview" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Debitado (R$)</label>
+                        <input type="text" class="form-control" name="debitado" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>Adicionar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar Item</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="editItemForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Produto</label>
+                            <select class="form-select" name="produto" id="editProduto" required>
+                                {% for p in produtos %}
+                                <option value="{{ p }}">{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Empenho</label>
+                            <select class="form-select" name="empenho_id" id="editEmpenho" required>
+                                {% for emp in empenhos %}
+                                <option value="{{ emp.id }}">
+                                    {{ emp.display_number }} - SE {{ emp.sub_elemento }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Nome do Servico</label>
+                            <input type="text" class="form-control" name="servico" id="editServico" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Periodo do Evento</label>
+                            <input type="text" class="form-control" name="data_evento" id="editEvento">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Valor Contrato</label>
+                            <input type="text" class="form-control" name="valor_contrato" id="editContrato">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Valor Unitario (R$)</label>
+                            <input type="text" class="form-control" name="valor_unitario" id="editUnitario" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" class="form-control" name="quantidade" id="editQtd" min="0" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" name="ir_applicable" id="editIrApplicable" checked>
+                                <label class="form-check-label" for="editIrApplicable">IR Aplicavel</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Aliquota IR (%)</label>
+                            <input type="text" class="form-control" name="ir_rate" id="editIrRate" value="2.4">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Debitado (R$)</label>
+                            <input type="text" class="form-control" name="debitado" id="editDebitado">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-fill from service type
+document.getElementById('serviceTypeSelect').addEventListener('change', function() {
+    const id = this.value;
+    if (!id) return;
+    fetch('/api/service-type/' + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('addProduto').value = data.produto;
+            document.getElementById('addServico').value = data.nome;
+            document.getElementById('addContrato').value = data.valor_contrato || '';
+            document.getElementById('addUnitario').value = data.valor_unitario_padrao;
+            document.getElementById('addIrApplicable').checked = data.ir_applicable;
+            document.getElementById('addIrRate').value = data.ir_rate;
+            // Auto-select empenho by sub_elemento
+            const empSelect = document.getElementById('addEmpenho');
+            for (let opt of empSelect.options) {
+                if (opt.dataset.sub === data.sub_elemento) {
+                    empSelect.value = opt.value;
+                    break;
+                }
+            }
+            calcPreview();
+        });
+});
+
+// Live calculation preview
+function calcPreview() {
+    const unit = parseFloat(document.getElementById('addUnitario').value) || 0;
+    const qty = parseInt(document.getElementById('addQtd').value) || 0;
+    const irOn = document.getElementById('addIrApplicable').checked;
+    const irRate = parseFloat(document.getElementById('addIrRate').value) / 100 || 0;
+    const total = unit * qty;
+    const ir = irOn ? Math.round(total * irRate * 100) / 100 : 0;
+    const liq = total - ir;
+    const fmt = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
+    document.getElementById('addTotalPreview').value = fmt.format(total);
+    document.getElementById('addIrPreview').value = fmt.format(ir);
+    document.getElementById('addLiqPreview').value = fmt.format(liq);
+}
+
+// Edit modal population
+document.querySelectorAll('.btn-edit-item').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const id = this.dataset.id;
+        const compId = {{ competencia.id }};
+        document.getElementById('editItemForm').action = '/competencias/' + compId + '/item/' + id + '/edit';
+        document.getElementById('editProduto').value = this.dataset.produto;
+        document.getElementById('editEmpenho').value = this.dataset.empenho;
+        document.getElementById('editServico').value = this.dataset.servico;
+        document.getElementById('editEvento').value = this.dataset.evento;
+        document.getElementById('editContrato').value = this.dataset.contrato;
+        document.getElementById('editUnitario').value = this.dataset.unitario;
+        document.getElementById('editQtd').value = this.dataset.quantidade;
+        document.getElementById('editIrApplicable').checked = this.dataset.irApplicable === 'on';
+        document.getElementById('editIrRate').value = this.dataset.irRate;
+        document.getElementById('editDebitado').value = this.dataset.debitado;
+    });
+});
+</script>
+{% endblock %}
