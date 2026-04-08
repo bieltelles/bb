@@ -10,6 +10,7 @@ from config import Config
 from models import (db, Contract, Empenho, Competencia, ServiceItem,
                     ServiceType, MESES, STATUS_COMPETENCIA, PRODUTOS)
 from ir_calculator import calcular_retencao, calcular_competencia, ALIQUOTA_EFETIVA
+from pdf_parser import parse_pdf
 
 
 def create_app(config_class=Config):
@@ -460,6 +461,123 @@ def create_app(config_class=Config):
                                contract=contract,
                                empenhos=empenhos,
                                service_types=service_types)
+
+    # ---------------------------------------------------------------
+    # IMPORT OFICIOS PDF
+    # ---------------------------------------------------------------
+    @app.route('/importar', methods=['GET', 'POST'])
+    def import_oficios():
+        contract = Contract.query.first()
+        if not contract:
+            return redirect(url_for('setup'))
+
+        empenhos = Empenho.query.filter_by(contract_id=contract.id).all()
+        results = []
+        detected_month = None
+        detected_year = None
+
+        if request.method == 'POST':
+            action = request.form.get('action')
+
+            if action == 'analyze':
+                files = request.files.getlist('pdfs')
+                import tempfile
+                for f in files:
+                    if f and f.filename.endswith('.pdf'):
+                        with tempfile.NamedTemporaryFile(suffix='.pdf',
+                                                         delete=False) as tmp:
+                            f.save(tmp.name)
+                            try:
+                                result = parse_pdf(tmp.name)
+                                result['filename'] = f.filename
+                                results.append(result)
+                            except Exception as e:
+                                results.append({
+                                    'filename': f.filename,
+                                    'error': str(e),
+                                    'items': [], 'valid': False,
+                                })
+                            finally:
+                                os.unlink(tmp.name)
+
+                for r in results:
+                    if r.get('end_month'):
+                        detected_month = r['end_month']
+                        detected_year = r['end_year']
+                        break
+
+                # Store results in session for confirm step
+                from flask import session
+                session['import_results'] = results
+                session['detected_month'] = detected_month
+                session['detected_year'] = detected_year
+
+                return render_template('import_oficios.html',
+                                       contract=contract,
+                                       empenhos=empenhos,
+                                       results=results,
+                                       detected_month=detected_month,
+                                       detected_year=detected_year,
+                                       step='preview')
+
+            elif action == 'confirm':
+                from flask import session
+                results = session.get('import_results', [])
+                month = int(request.form.get('month', 3))
+                year = int(request.form.get('year', 2026))
+                status = request.form.get('status', 'EM ANÁLISE')
+
+                # Find or create competencia
+                comp = Competencia.query.filter_by(
+                    contract_id=contract.id, month=month, year=year
+                ).first()
+                if not comp:
+                    oficio_nums = ', '.join(
+                        r.get('oficio_num', '') for r in results
+                        if r.get('oficio_num'))
+                    comp = Competencia(
+                        contract_id=contract.id, month=month, year=year,
+                        oficio_number=oficio_nums, status=status)
+                    db.session.add(comp)
+                    db.session.flush()
+
+                count = 0
+                for r in results:
+                    for item in r.get('items', []):
+                        emp = next((e for e in empenhos
+                                    if e.sub_elemento == item['sub_elemento']),
+                                   empenhos[0] if empenhos else None)
+                        if not emp:
+                            continue
+                        si = ServiceItem(
+                            competencia_id=comp.id,
+                            empenho_id=emp.id,
+                            data_evento=r.get('periodo', ''),
+                            produto=item['produto'],
+                            servico=item['servico'],
+                            valor_contrato=f"R$ {item['valor_unitario']:.2f}",
+                            valor_unitario=item['valor_unitario'],
+                            quantidade=item['quantidade'],
+                            valor_total=item['valor_total'],
+                            ir_applicable=True,
+                            ir_rate=0.024,
+                            ir_value=item['ir_value'],
+                            valor_liquido=item['valor_liquido'],
+                        )
+                        db.session.add(si)
+                        count += 1
+
+                db.session.commit()
+                session.pop('import_results', None)
+                flash(f'{count} itens importados para '
+                      f'{MESES.get(month, "?")}/{year}!', 'success')
+                return redirect(url_for('competencia_detail', id=comp.id))
+
+        return render_template('import_oficios.html',
+                               contract=contract,
+                               empenhos=empenhos,
+                               results=[],
+                               step='upload')
 
     # ---------------------------------------------------------------
     # PDF REPORTS

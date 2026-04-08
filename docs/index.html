@@ -63,11 +63,27 @@ body{background:#f0f2f5;font-family:'Segoe UI',system-ui,sans-serif}
 <div class="modal-body" id="empModalBody"></div>
 <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" id="empModalSave">Salvar</button></div>
 </div></div></div>
+<div class="modal fade" id="importModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content">
+<div class="modal-header bg-success text-white"><h5 class="modal-title"><i class="bi bi-file-earmark-pdf me-2"></i>Importar Oficios do Banco do Brasil</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<div class="mb-3"><label class="form-label fw-bold">Selecione os PDFs dos oficios (1 a 6 arquivos)</label>
+<input type="file" class="form-control" id="importFileInput" accept=".pdf" multiple>
+<small class="text-muted">Aceita os 6 oficios mensais do BB: CBR 1a/2a quinzena, Arrecadacao, ORBAN, Pagamentos, Salarios</small></div>
+<div class="d-grid mb-3"><button class="btn btn-success" onclick="analyzeFiles()"><i class="bi bi-search me-1"></i>Analisar PDFs</button></div>
+<div id="importStatus"></div>
+<div id="importPreview"></div>
+</div>
+<div class="modal-footer" id="importActions" style="display:none">
+<button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+<button class="btn btn-success" onclick="confirmImport()"><i class="bi bi-check-circle me-1"></i>Confirmar Importacao</button>
+</div>
+</div></div></div>
 <footer class="py-2 bg-light border-top text-muted small text-center no-print footer-bar">
 SEMFAZ - Secretaria Municipal de Fazenda | Sistema de Acompanhamento Contratual | Contrato 591/2025 - Banco do Brasil S.A.
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 // ==================== DATA LAYER ====================
 const MESES=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -166,7 +182,8 @@ function renderDashboard(){
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div><h4 class="mb-1"><i class="bi bi-speedometer2 me-2"></i>Dashboard - Contrato 591/2025</h4>
     <p class="text-muted mb-0">Banco do Brasil S.A. - Servicos Financeiros</p></div>
-    <button class="btn btn-primary no-print" onclick="openNewComp()"><i class="bi bi-plus-circle me-1"></i>Nova Competencia</button>
+    <div class="d-flex gap-2 no-print"><button class="btn btn-success" onclick="openImportModal()"><i class="bi bi-file-earmark-pdf me-1"></i>Importar Oficios</button>
+    <button class="btn btn-primary" onclick="openNewComp()"><i class="bi bi-plus-circle me-1"></i>Nova Competencia</button></div>
   </div>
   <div class="row mb-4">
     <div class="col-lg-3 col-md-6 mb-3"><div class="card card-dash shadow-sm"><div class="card-body">
@@ -252,7 +269,8 @@ function renderCompetencias(){
   let html=`
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div><h4 class="mb-1"><i class="bi bi-calendar-month me-2"></i>Competencias</h4><p class="text-muted mb-0">Liquidacao mensal de despesas</p></div>
-    <button class="btn btn-primary" onclick="openNewComp()"><i class="bi bi-plus-circle me-1"></i>Nova Competencia</button></div>
+    <div class="d-flex gap-2"><button class="btn btn-success" onclick="openImportModal()"><i class="bi bi-file-earmark-pdf me-1"></i>Importar Oficios PDF</button>
+    <button class="btn btn-primary" onclick="openNewComp()"><i class="bi bi-plus-circle me-1"></i>Nova Competencia</button></div></div>
   <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0">
   <thead class="table-light"><tr><th>Competencia</th><th>Oficio</th><th>Status</th><th class="text-center">Itens</th><th class="text-end">Valor Total</th><th class="text-end">IR</th><th class="text-end">Valor Liquido</th><th class="text-center">Acoes</th></tr></thead>
   <tbody>${comps.map(c=>{
@@ -617,6 +635,235 @@ function printCompPdf(compId){
   currentCompId=compId;
   showSection('comp-detail',compId);
   setTimeout(()=>window.print(),300);
+}
+
+// ==================== PDF IMPORT ====================
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// Mapping: PDF description pattern + tariff → SERVICE_TYPES index
+const PDF_MAP=[
+{re:/cbr liquida/i,t:4.95,idx:0},{re:/cbr liquida/i,t:0.87,idx:1},
+{re:/barra internet/i,t:2.53,idx:2},{re:/barras taa/i,t:2.53,idx:3},
+{re:/barr gefin/i,t:2.53,idx:4},{re:/barr coban/i,t:2.53,idx:5},
+{re:/barras pgt/i,t:2.53,idx:6},{re:/multibanco/i,t:2.53,idx:7},
+{re:/pix municipa/i,t:0.87,idx:8},
+{re:/ordem banc.*cr/i,t:1.02,idx:9},{re:/orban.*fatura/i,t:3.03,idx:10},
+{re:/ordem banc.*tributo/i,t:106.50,idx:11},
+{re:/pag fornec.*cr/i,t:1.02,idx:12},{re:/pgto fornecedores/i,t:4.51,idx:13},
+{re:/tarifa sobre pag/i,t:1.02,idx:14},{re:/tarifa sobre pag/i,t:4.51,idx:15},
+{re:/pgto sal/i,t:1.02,idx:16}
+];
+
+function parseBRLval(s){return parseFloat(s.replace(/\./g,'').replace(',','.'))}
+
+async function extractPdfText(file){
+  let ab=await file.arrayBuffer();
+  let pdf=await pdfjsLib.getDocument({data:new Uint8Array(ab)}).promise;
+  let allText='';
+  for(let p=1;p<=pdf.numPages;p++){
+    let page=await pdf.getPage(p);
+    let tc=await page.getTextContent();
+    let lines={};
+    tc.items.forEach(it=>{
+      let y=Math.round(it.transform[5]*10);
+      if(!lines[y]) lines[y]=[];
+      lines[y].push({x:it.transform[4],t:it.str});
+    });
+    let ys=Object.keys(lines).sort((a,b)=>b-a);
+    allText+=ys.map(y=>lines[y].sort((a,b)=>a.x-b.x).map(i=>i.t).join(' ')).join('\n')+'\n';
+  }
+  return allText;
+}
+
+function parseOficio(text){
+  let oficioNum='',m;
+  m=text.match(/(3384626091\d{5})/);
+  if(m) oficioNum=m[1];
+
+  let periodo='',endDate=null;
+  m=text.match(/per[ií]odo.*?(\d{2}\/\d{2}\/\d{4})\s*a\s*(\d{2}\/\d{2}\/\d{4})/i);
+  if(!m) m=text.match(/(\d{2}\/\d{2}\/\d{4})\s*a\s*(\d{2}\/\d{2}\/\d{4})/);
+  if(m){
+    periodo=m[1]+' a '+m[2];
+    let p=m[2].split('/');
+    endDate={month:parseInt(p[1]),year:parseInt(p[2])};
+  }
+
+  let valorBruto=0;
+  m=text.match(/Valor bruto.*?R\$\s*([\d.]+,\d{2})/i);
+  if(m) valorBruto=parseBRLval(m[1]);
+
+  let irOficio=0;
+  m=text.match(/IR\*?:\s*([\d.]+,\d{2})/);
+  if(m) irOficio=parseBRLval(m[1]);
+
+  // Extract table rows: DD.MM.YYYY DD.MM.YYYY Description Qty Tariff Total D
+  let rows=[];
+  let rx=/(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+(\d+)\s+([\d.]+,\d{2})\s+([\d.]+,\d{2})\s+D/g;
+  while((m=rx.exec(text))!==null){
+    rows.push({desc:m[3].trim(),qtd:parseInt(m[4]),tarifa:parseBRLval(m[5]),total:parseBRLval(m[6])});
+  }
+
+  // Consolidate by (description, tariff)
+  let consol={};
+  rows.forEach(r=>{
+    let k=r.desc+'|'+r.tarifa.toFixed(2);
+    if(!consol[k]) consol[k]={desc:r.desc,tarifa:r.tarifa,qtd:0,total:0};
+    consol[k].qtd+=r.qtd;
+    consol[k].total+=r.total;
+  });
+
+  // Map to SERVICE_TYPES
+  let items=Object.values(consol).map(c=>{
+    c.total=Math.round(c.total*100)/100;
+    let st=null;
+    for(let pm of PDF_MAP){
+      if(pm.re.test(c.desc)&&Math.abs(c.tarifa-pm.t)<0.02){st=SERVICE_TYPES[pm.idx];break;}
+    }
+    return{
+      produto:st?st.produto:'OUTROS',servico:st?st.nome:c.desc,
+      se:st?st.se:'98',valorUnit:c.tarifa,qtd:c.qtd,
+      valorTotal:c.total,matched:!!st
+    };
+  });
+
+  return{oficioNum,periodo,endDate,valorBruto,irOficio,items,rowCount:rows.length};
+}
+
+let importResults=[];
+
+function openImportModal(){
+  document.getElementById('importFileInput').value='';
+  document.getElementById('importPreview').innerHTML='';
+  document.getElementById('importActions').style.display='none';
+  document.getElementById('importStatus').innerHTML='';
+  importResults=[];
+  new bootstrap.Modal(document.getElementById('importModal')).show();
+}
+
+async function analyzeFiles(){
+  let files=document.getElementById('importFileInput').files;
+  if(!files.length){alert('Selecione os PDFs dos oficios.');return;}
+  let status=document.getElementById('importStatus');
+  importResults=[];
+  try{
+    for(let i=0;i<files.length;i++){
+      status.innerHTML=`<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Analisando ${i+1}/${files.length}: ${files[i].name}</div>`;
+      let text=await extractPdfText(files[i]);
+      let result=parseOficio(text);
+      result.fileName=files[i].name;
+      importResults.push(result);
+    }
+  }catch(err){
+    status.innerHTML=`<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Erro: ${err.message}</div>`;
+    return;
+  }
+  status.innerHTML='';
+  renderImportPreview();
+}
+
+function renderImportPreview(){
+  if(!importResults.length) return;
+  let detMonth=null,detYear=null;
+  for(let r of importResults){if(r.endDate){detMonth=r.endDate.month;detYear=r.endDate.year;break;}}
+
+  let totalBruto=importResults.reduce((s,r)=>s+r.valorBruto,0);
+  let totalIR=importResults.reduce((s,r)=>s+r.irOficio,0);
+  let totalItems=importResults.reduce((s,r)=>s+r.items.length,0);
+
+  let html=`<div class="alert alert-info mb-3"><i class="bi bi-info-circle me-2"></i><strong>${importResults.length} oficio(s)</strong> analisados:
+  ${totalItems} servicos, Total Bruto: ${brl0(totalBruto)}, IR: ${brl0(totalIR)}, Liquido: ${brl0(totalBruto-totalIR)}</div>
+  <div class="row mb-3">
+  <div class="col-md-4"><label class="form-label fw-bold">Mes da Competencia</label><select class="form-select" id="impMonth">
+  ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}"${m===detMonth?' selected':''}>${MESES[m]}</option>`).join('')}</select></div>
+  <div class="col-md-4"><label class="form-label fw-bold">Ano</label><input type="number" class="form-control" id="impYear" value="${detYear||2026}"></div>
+  <div class="col-md-4"><label class="form-label fw-bold">Status</label><select class="form-select" id="impStatus">
+  <option>PENDENTE</option><option selected>EM ANALISE</option><option>LIQUIDADO</option><option>PAGO</option></select></div></div>`;
+
+  importResults.forEach((r,ri)=>{
+    let ok=r.items.length>0;
+    let parsedTot=r.items.reduce((s,i)=>s+i.valorTotal,0);
+    let diff=Math.abs(parsedTot-r.valorBruto);
+    let valOk=diff<0.50;
+    let badge=ok&&valOk?'success':'warning';
+
+    html+=`<div class="card mb-2 border-${badge}"><div class="card-header py-2 d-flex justify-content-between align-items-center bg-${badge} bg-opacity-10" style="cursor:pointer" onclick="document.getElementById('ofc${ri}').classList.toggle('show')">
+    <span><i class="bi bi-file-earmark-pdf me-2"></i><strong>Oficio ${r.oficioNum?r.oficioNum.slice(-1):ri+1}</strong>
+    <small class="text-muted ms-2">${r.periodo||r.fileName}</small></span>
+    <div><span class="badge bg-${badge} me-2">${r.items.length} servico(s)</span>
+    <span class="badge bg-dark">${brl0(r.valorBruto)}</span>
+    ${!valOk?'<span class="badge bg-danger ms-1">Dif: '+brl0(diff)+'</span>':''}</div></div>
+    <div class="collapse show" id="ofc${ri}"><div class="card-body p-0">
+    <table class="table table-sm table-hover mb-0" style="font-size:.82rem"><thead class="table-light">
+    <tr><th>Produto</th><th>Servico</th><th class="text-end">Tarifa</th><th class="text-center">Qtd</th><th class="text-end">Val.Total</th><th class="text-end">IR 2,4%</th><th class="text-end">Liquido</th><th>Empenho</th></tr></thead><tbody>`;
+
+    r.items.forEach(it=>{
+      let ir=Math.round(it.valorTotal*IR_RATE*100)/100;
+      let emp=loadData().empenhos.find(e=>e.se===it.se);
+      html+=`<tr class="${it.matched?'':'table-warning'}"><td><small>${it.produto}</small></td><td>${it.servico}${!it.matched?' <i class="bi bi-exclamation-triangle text-warning" title="Nao mapeado"></i>':''}</td>
+      <td class="text-end">${brl0(it.valorUnit)}</td><td class="text-center fw-bold">${it.qtd.toLocaleString('pt-BR')}</td>
+      <td class="text-end">${brl0(it.valorTotal)}</td><td class="text-end text-danger">${brl0(ir)}</td>
+      <td class="text-end fw-bold">${brl0(it.valorTotal-ir)}</td>
+      <td><span class="badge bg-secondary">NE ${emp?emp.number:'?'} SE ${it.se}</span></td></tr>`;
+    });
+
+    let subTot=r.items.reduce((s,i)=>s+i.valorTotal,0);
+    let subIR=Math.round(subTot*IR_RATE*100)/100;
+    html+=`<tr class="fw-bold table-light"><td colspan="4">Subtotal Oficio</td><td class="text-end">${brl0(subTot)}</td>
+    <td class="text-end text-danger">${brl0(subIR)}</td><td class="text-end">${brl0(subTot-subIR)}</td><td></td></tr>
+    </tbody></table></div></div></div>`;
+  });
+
+  // Grand total
+  let gBruto=importResults.reduce((s,r)=>s+r.items.reduce((a,i)=>a+i.valorTotal,0),0);
+  let gIR=Math.round(gBruto*IR_RATE*100)/100;
+  html+=`<div class="card border-primary mt-3"><div class="card-body py-2 d-flex justify-content-between align-items-center">
+  <strong>TOTAL GERAL</strong>
+  <div><span class="me-3">Bruto: <strong>${brl0(gBruto)}</strong></span>
+  <span class="me-3 text-danger">IR: <strong>${brl0(gIR)}</strong></span>
+  <span class="text-success">Liquido: <strong>${brl0(gBruto-gIR)}</strong></span></div></div></div>`;
+
+  document.getElementById('importPreview').innerHTML=html;
+  document.getElementById('importActions').style.display='flex';
+}
+
+function confirmImport(){
+  if(!importResults.length){alert('Nenhum oficio analisado.');return;}
+  let data=loadData();
+  let m=parseInt(document.getElementById('impMonth').value);
+  let y=parseInt(document.getElementById('impYear').value);
+
+  let existing=data.competencias.find(c=>c.month===m&&c.year===y);
+  if(existing&&!confirm(`Competencia ${MESES[m]}/${y} ja existe com ${compItems(data,existing.id).length} itens.\nDeseja ADICIONAR os novos itens a ela?`)) return;
+
+  let comp=existing;
+  if(!comp){
+    comp={id:data.nextCompId++,month:m,year:y,
+      oficio:importResults.map(r=>r.oficioNum).filter(Boolean).join(', '),
+      status:document.getElementById('impStatus').value};
+    data.competencias.push(comp);
+  }
+
+  let emps=data.empenhos;
+  let count=0;
+  importResults.forEach(r=>{
+    r.items.forEach(it=>{
+      let emp=emps.find(e=>e.se===it.se)||emps[0];
+      let ir=Math.round(it.valorTotal*IR_RATE*100)/100;
+      data.items.push({
+        id:data.nextItemId++,compId:comp.id,empId:emp.id,
+        produto:it.produto,servico:it.servico,periodo:r.periodo||'',
+        valorUnit:it.valorUnit,qtd:it.qtd,irOn:true,
+        valorTotal:it.valorTotal,irValue:ir,valorLiquido:it.valorTotal-ir
+      });
+      count++;
+    });
+  });
+
+  saveData(data);
+  bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
+  alert(`Importacao concluida!\n${count} itens adicionados a ${MESES[m]}/${y}.`);
+  showSection('comp-detail',comp.id);
 }
 
 // ==================== INIT ====================
