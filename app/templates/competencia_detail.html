@@ -9,16 +9,25 @@
             <i class="bi bi-calendar-check me-2"></i>{{ competencia.display_name }}
         </h4>
         <p class="text-muted mb-0">
-            Oficio: {{ competencia.oficio_number or 'N/A' }}
+            Oficios:
+            {% set oficios = competencia.items | map(attribute='processo') | select | unique | list %}
+            {% if oficios %}
+                {% for ofc in oficios %}<span class="badge bg-light text-dark me-1">{{ ofc[-3:] }}</span>{% endfor %}
+            {% else %}
+                {{ competencia.oficio_number or 'N/A' }}
+            {% endif %}
             {% if competencia.oficio_date %} | Data: {{ competencia.oficio_date.strftime('%d/%m/%Y') }}{% endif %}
-            <span class="badge ms-2
-                {% if competencia.status == 'PAGO' %}bg-success
-                {% elif competencia.status == 'LIQUIDADO' %}bg-info
-                {% elif competencia.status == 'EM ANÁLISE' %}bg-warning
-                {% else %}bg-secondary{% endif %}">
-                {{ competencia.status }}
-            </span>
         </p>
+        <form method="POST" action="{{ url_for('competencia_edit', id=competencia.id) }}" class="d-inline mt-1">
+            <input type="hidden" name="oficio_number" value="{{ competencia.oficio_number or '' }}">
+            <input type="hidden" name="observacoes" value="{{ competencia.observacoes or '' }}">
+            <label class="form-label mb-0 small text-muted me-1">Status:</label>
+            <select name="status" class="form-select form-select-sm d-inline-block" style="width:auto" onchange="this.form.submit()">
+                {% for s in ['PENDENTE', 'EM ANALISE', 'LIQUIDADO', 'PAGO'] %}
+                <option {% if s == competencia.status %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </form>
     </div>
     <div class="d-flex gap-2">
         <a href="{{ url_for('competencia_edit', id=competencia.id) }}" class="btn btn-outline-secondary btn-sm">
@@ -83,6 +92,7 @@
                         <th>Empenho</th>
                         <th>SubElemento</th>
                         <th>Descricao</th>
+                        <th>Oficios</th>
                         <th class="text-center">Itens</th>
                         <th class="text-end">Valor Total</th>
                         <th class="text-end">IR Retido</th>
@@ -95,6 +105,11 @@
                         <td><strong>{{ data.empenho.display_number }}</strong></td>
                         <td><span class="badge bg-primary">SE {{ data.empenho.sub_elemento }}</span></td>
                         <td>{{ data.empenho.description }}</td>
+                        <td>
+                            {% set emp_oficios = data.service_items | map(attribute='processo') | select | unique | list %}
+                            {% for ofc in emp_oficios %}<small class="badge bg-light text-dark me-1">{{ ofc[-3:] }}</small>{% endfor %}
+                            {% if not emp_oficios %}-{% endif %}
+                        </td>
                         <td class="text-center">{{ data.service_items|length }}</td>
                         <td class="text-end">{{ data.valor_total|brl }}</td>
                         <td class="text-end text-danger">{{ data.total_ir|brl }}</td>
@@ -104,7 +119,7 @@
                 </tbody>
                 <tfoot class="table-light">
                     <tr class="fw-bold">
-                        <td colspan="4">TOTAL GERAL</td>
+                        <td colspan="5">TOTAL GERAL</td>
                         <td class="text-end">{{ competencia.valor_total|brl_always }}</td>
                         <td class="text-end text-danger">{{ competencia.total_ir|brl_always }}</td>
                         <td class="text-end">{{ competencia.total_liquido|brl_always }}</td>
@@ -131,7 +146,7 @@
                     <tr>
                         <th>Produto</th>
                         <th>Servico</th>
-                        <th>Periodo</th>
+                        <th>Oficio</th>
                         <th class="text-end">Valor Unit.</th>
                         <th class="text-center">Qtd</th>
                         <th class="text-end">Valor Total</th>
@@ -146,7 +161,7 @@
                     <tr>
                         <td><small class="text-muted">{{ item.produto }}</small></td>
                         <td>{{ item.servico }}</td>
-                        <td><small>{{ item.data_evento or '-' }}</small></td>
+                        <td><small title="{{ item.processo or item.data_evento or '' }}">{{ (item.processo[-3:] if item.processo else item.data_evento) or '-' }}</small></td>
                         <td class="text-end">{{ item.valor_unitario|brl }}</td>
                         <td class="text-center">{{ item.quantidade }}</td>
                         <td class="text-end">{{ item.valor_total|brl }}</td>

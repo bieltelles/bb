@@ -278,8 +278,12 @@ function renderCompetencias(){
     let tot=items.reduce((s,i)=>s+(i.valorTotal||0),0);
     let ir=items.reduce((s,i)=>s+(i.irValue||0),0);
     let liq=items.reduce((s,i)=>s+(i.valorLiquido||0),0);
+    let oficios=[...new Set(items.map(i=>i.oficioNum).filter(Boolean))];
+    let oficioCol=oficios.length>0?oficios.map(n=>'<small>'+n.slice(-3)+'</small>').join(' '):(c.oficio||'-');
     return`<tr><td><a href="#" onclick="showSection('comp-detail',${c.id})" class="text-decoration-none fw-bold">${MESES[c.month]}/${c.year}</a></td>
-    <td>${c.oficio||'-'}</td><td>${statusBadge(c.status)}</td><td class="text-center"><span class="badge bg-light text-dark">${items.length}</span></td>
+    <td>${oficioCol}</td><td><select class="form-select form-select-sm" style="width:auto;font-size:.78rem" onchange="updateCompStatus(${c.id},this.value);renderCompetencias()">
+    ${['PENDENTE','EM ANALISE','LIQUIDADO','PAGO'].map(s=>`<option${s===c.status?' selected':''}>${s}</option>`).join('')}
+    </select></td><td class="text-center"><span class="badge bg-light text-dark">${items.length}</span></td>
     <td class="text-end">${brl(tot)}</td><td class="text-end text-danger">${brl(ir)}</td><td class="text-end fw-bold">${brl(liq)}</td>
     <td class="text-center"><div class="btn-group btn-group-sm">
     <button class="btn btn-outline-primary" onclick="showSection('comp-detail',${c.id})" title="Detalhes"><i class="bi bi-eye"></i></button>
@@ -344,10 +348,17 @@ function renderCompDetail(compId){
     byEmp[i.empId].liq+=i.valorLiquido||0;
   });
 
+  // Collect distinct oficio numbers from items
+  let oficioNums=[...new Set(items.map(i=>i.oficioNum).filter(Boolean))];
+  let oficioDisplay=oficioNums.length>0?oficioNums.map(n=>n.slice(-3)).join(', '):(comp.oficio||'N/A');
+
   let html=`
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div><h4 class="mb-1"><i class="bi bi-calendar-check me-2"></i>${MESES[comp.month]}/${comp.year}</h4>
-    <p class="text-muted mb-0">Oficio: ${comp.oficio||'N/A'} ${statusBadge(comp.status)}</p></div>
+    <p class="text-muted mb-0">Oficios: ${oficioDisplay}
+    <select class="form-select form-select-sm d-inline-block ms-2 no-print" style="width:auto" onchange="updateCompStatus(${compId},this.value)">
+    ${['PENDENTE','EM ANALISE','LIQUIDADO','PAGO'].map(s=>`<option${s===comp.status?' selected':''}>${s}</option>`).join('')}
+    </select></p></div>
     <div class="d-flex gap-2 no-print">
     <button class="btn btn-outline-secondary btn-sm" onclick="showSection('competencias')"><i class="bi bi-arrow-left me-1"></i>Voltar</button>
     <button class="btn btn-outline-danger btn-sm" onclick="printCompPdf(${compId})"><i class="bi bi-file-pdf me-1"></i>PDF</button>
@@ -363,14 +374,16 @@ function renderCompDetail(compId){
   if(Object.keys(byEmp).length>0){
     html+=`<div class="card border-0 shadow-sm mb-4"><div class="card-header bg-white border-0"><h6 class="mb-0"><i class="bi bi-wallet2 me-2"></i>Resumo por Empenho</h6></div>
     <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light">
-    <tr><th>Empenho</th><th>SE</th><th class="text-center">Itens</th><th class="text-end">Valor Total</th><th class="text-end">IR</th><th class="text-end">Valor Liquido</th></tr></thead><tbody>`;
+    <tr><th>Empenho</th><th>SE</th><th>Oficios</th><th class="text-center">Itens</th><th class="text-end">Valor Total</th><th class="text-end">IR</th><th class="text-end">Valor Liquido</th></tr></thead><tbody>`;
     for(let eid in byEmp){
       let e=emps.find(x=>x.id==eid);
       let d=byEmp[eid];
+      let empOficios=[...new Set(d.items.map(i=>i.oficioNum).filter(Boolean))].map(n=>n.slice(-3)).join(', ');
       html+=`<tr><td><strong>${e?e.number+'/'+e.year:'-'}</strong></td><td><span class="badge bg-primary">SE ${e?e.se:'-'}</span></td>
+      <td><small>${empOficios||'-'}</small></td>
       <td class="text-center">${d.items.length}</td><td class="text-end">${brl(d.tot)}</td><td class="text-end text-danger">${brl(d.ir)}</td><td class="text-end fw-bold">${brl(d.liq)}</td></tr>`;
     }
-    html+=`</tbody><tfoot class="table-light"><tr class="fw-bold"><td colspan="3">TOTAL</td><td class="text-end">${brl0(tot)}</td><td class="text-end text-danger">${brl0(ir)}</td><td class="text-end">${brl0(liq)}</td></tr></tfoot></table></div></div></div>`;
+    html+=`</tbody><tfoot class="table-light"><tr class="fw-bold"><td colspan="4">TOTAL</td><td class="text-end">${brl0(tot)}</td><td class="text-end text-danger">${brl0(ir)}</td><td class="text-end">${brl0(liq)}</td></tr></tfoot></table></div></div></div>`;
   }
 
   // Items table
@@ -378,10 +391,11 @@ function renderCompDetail(compId){
   <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Itens de Servico</h6>
   <button class="btn btn-primary btn-sm no-print" onclick="openAddItem(${compId})"><i class="bi bi-plus me-1"></i>Novo</button></div>
   <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0" style="font-size:.85rem">
-  <thead class="table-light"><tr><th>Produto</th><th>Servico</th><th>Periodo</th><th class="text-end">Val.Unit.</th><th class="text-center">Qtd</th><th class="text-end">Val.Total</th><th class="text-end">IR</th><th class="text-end">Val.Liq.</th><th>Empenho</th><th class="text-center no-print">Acoes</th></tr></thead>
+  <thead class="table-light"><tr><th>Produto</th><th>Servico</th><th>Oficio</th><th class="text-end">Val.Unit.</th><th class="text-center">Qtd</th><th class="text-end">Val.Total</th><th class="text-end">IR</th><th class="text-end">Val.Liq.</th><th>Empenho</th><th class="text-center no-print">Acoes</th></tr></thead>
   <tbody>${items.map(i=>{
     let e=emps.find(x=>x.id===i.empId);
-    return`<tr><td><small class="text-muted">${i.produto}</small></td><td>${i.servico}</td><td><small>${i.periodo||'-'}</small></td>
+    let ofcDisp=i.oficioNum?i.oficioNum.slice(-3):(i.periodo||'-');
+    return`<tr><td><small class="text-muted">${i.produto}</small></td><td>${i.servico}</td><td><small title="${i.oficioNum||i.periodo||''}">${ofcDisp}</small></td>
     <td class="text-end">${brl(i.valorUnit)}</td><td class="text-center">${i.qtd}</td><td class="text-end">${brl(i.valorTotal)}</td>
     <td class="text-end text-danger">${brl(i.irValue)}</td><td class="text-end fw-bold">${brl(i.valorLiquido)}</td>
     <td><span class="badge bg-light text-dark">${e?e.number+'/'+e.year:'-'}</span></td>
@@ -463,11 +477,13 @@ function calcItemPreview(){
 
 function saveItem(compId,editId){
   let data=loadData();
+  let existingItem=editId?data.items.find(i=>i.id===editId):null;
   let obj={
     compId,empId:parseInt(document.getElementById('itemEmp').value),
     produto:document.getElementById('itemProduto').value,
     servico:document.getElementById('itemServico').value,
     periodo:document.getElementById('itemPeriodo').value,
+    oficioNum:existingItem?existingItem.oficioNum||'':'',
     valorUnit:parseFloat(document.getElementById('itemUnit').value)||0,
     qtd:parseInt(document.getElementById('itemQtd').value)||0,
     irOn:document.getElementById('itemIrOn').checked
@@ -495,6 +511,12 @@ function deleteItem(itemId,compId){
   saveData(data);
   showSection('comp-detail',compId);
 }
+function updateCompStatus(compId,newStatus){
+  let data=loadData();
+  let comp=data.competencias.find(c=>c.id===compId);
+  if(comp){comp.status=newStatus;saveData(data);}
+}
+
 // ==================== EMPENHOS ====================
 function renderEmpenhos(){
   const data=loadData();
@@ -853,6 +875,7 @@ function confirmImport(){
       data.items.push({
         id:data.nextItemId++,compId:comp.id,empId:emp.id,
         produto:it.produto,servico:it.servico,periodo:r.periodo||'',
+        oficioNum:r.oficioNum||'',
         valorUnit:it.valorUnit,qtd:it.qtd,irOn:true,
         valorTotal:it.valorTotal,irValue:ir,valorLiquido:it.valorTotal-ir
       });
