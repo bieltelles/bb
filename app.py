@@ -559,6 +559,7 @@ def create_app(config_class=Config):
                             valor_unitario=item['valor_unitario'],
                             quantidade=item['quantidade'],
                             valor_total=item['valor_total'],
+                            processo=r.get('oficio_num', ''),
                             ir_applicable=True,
                             ir_rate=0.024,
                             ir_value=item['ir_value'],
