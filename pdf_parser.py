@@ -45,6 +45,9 @@ SERVICE_MAP = [
      'PAGAMENTOS DIVERSOS', 'Tarifa sobre Pagamentos DOC/TED', '92'),
     (re.compile(r'pgto sal', re.I), 1.02,
      'PAGAMENTO DE SALARIO', 'Tarifa Pgto Salario Cred Conta', '93'),
+    # Tarifa que aparece em alguns meses - Float Pagamentos Diversos
+    (re.compile(r'float.*pagt|lib.*ant.*float', re.I), None,
+     'PAGAMENTOS DIVERSOS', 'Tarif Lib/Ant Float Pagtos Div', '92'),
 ]
 
 ROW_REGEX = re.compile(
@@ -61,8 +64,9 @@ def parse_brl(s):
 def match_service(desc, tarifa):
     """Match a PDF description + tariff to a known service type."""
     for pattern, expected_tarifa, produto, servico, se in SERVICE_MAP:
-        if pattern.search(desc) and abs(tarifa - expected_tarifa) < 0.02:
-            return produto, servico, se
+        if pattern.search(desc):
+            if expected_tarifa is None or abs(tarifa - expected_tarifa) < 0.02:
+                return produto, servico, se
     return None, desc, '98'
 
 
@@ -125,7 +129,6 @@ def parse_pdf(filepath):
     for c in consol.values():
         c['total'] = round(c['total'], 2)
         produto, servico, se = match_service(c['desc'], c['tarifa'])
-        ir_value = round(c['total'] * 0.024, 2)
         items.append({
             'produto': produto or 'OUTROS',
             'servico': servico,
@@ -133,10 +136,24 @@ def parse_pdf(filepath):
             'valor_unitario': c['tarifa'],
             'quantidade': c['qtd'],
             'valor_total': c['total'],
-            'ir_value': ir_value,
-            'valor_liquido': round(c['total'] - ir_value, 2),
+            'ir_value': 0.0,
+            'valor_liquido': 0.0,
             'matched': produto is not None,
         })
+
+    # Distribute oficio IR proportionally (avoids rounding divergence)
+    total_valor = sum(i['valor_total'] for i in items)
+    if total_valor > 0 and ir_oficio > 0:
+        remaining_ir = ir_oficio
+        for i, item in enumerate(items):
+            if i == len(items) - 1:
+                item['ir_value'] = round(remaining_ir, 2)
+            else:
+                item['ir_value'] = round(
+                    ir_oficio * item['valor_total'] / total_valor, 2)
+                remaining_ir -= item['ir_value']
+            item['valor_liquido'] = round(
+                item['valor_total'] - item['ir_value'], 2)
 
     parsed_total = sum(i['valor_total'] for i in items)
 
