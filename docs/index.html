@@ -107,7 +107,8 @@ const SERVICE_TYPES=[
 {produto:'PAGAMENTO A FORNECEDORES',nome:'Tarifa Pgto Fornecedores TED',se:'92',valor:4.51},
 {produto:'PAGAMENTOS DIVERSOS',nome:'Tarifa sobre Pagamentos Cred Cta',se:'92',valor:1.02},
 {produto:'PAGAMENTOS DIVERSOS',nome:'Tarifa sobre Pagamentos DOC/TED',se:'92',valor:4.51},
-{produto:'PAGAMENTO DE SALARIO',nome:'Tarifa Pgto Salario Cred Conta',se:'93',valor:1.02}
+{produto:'PAGAMENTO DE SALARIO',nome:'Tarifa Pgto Salario Cred Conta',se:'93',valor:1.02},
+{produto:'PAGAMENTOS DIVERSOS',nome:'Tarif Lib/Ant Float Pagtos Div',se:'92',valor:0}
 ];
 
 const DEFAULT_EMPENHOS=[
@@ -673,7 +674,8 @@ const PDF_MAP=[
 {re:/ordem banc.*tributo/i,t:106.50,idx:11},
 {re:/pag fornec.*cr/i,t:1.02,idx:12},{re:/pgto fornecedores/i,t:4.51,idx:13},
 {re:/tarifa sobre pag/i,t:1.02,idx:14},{re:/tarifa sobre pag/i,t:4.51,idx:15},
-{re:/pgto sal/i,t:1.02,idx:16}
+{re:/pgto sal/i,t:1.02,idx:16},
+{re:/float.*pagt|lib.*ant.*float/i,t:null,idx:17}
 ];
 
 function parseBRLval(s){return parseFloat(s.replace(/\./g,'').replace(',','.'))}
@@ -740,14 +742,29 @@ function parseOficio(text){
     c.total=Math.round(c.total*100)/100;
     let st=null;
     for(let pm of PDF_MAP){
-      if(pm.re.test(c.desc)&&Math.abs(c.tarifa-pm.t)<0.02){st=SERVICE_TYPES[pm.idx];break;}
+      if(pm.re.test(c.desc)&&(pm.t===null||Math.abs(c.tarifa-pm.t)<0.02)){st=SERVICE_TYPES[pm.idx];break;}
     }
     return{
       produto:st?st.produto:'OUTROS',servico:st?st.nome:c.desc,
       se:st?st.se:'98',valorUnit:c.tarifa,qtd:c.qtd,
-      valorTotal:c.total,matched:!!st
+      valorTotal:c.total,irValue:0,valorLiquido:0,matched:!!st
     };
   });
+
+  // Distribute oficio IR proportionally (matches bank calculation)
+  let totalVal=items.reduce((s,i)=>s+i.valorTotal,0);
+  if(totalVal>0&&irOficio>0){
+    let remaining=irOficio;
+    for(let i=0;i<items.length;i++){
+      if(i===items.length-1){
+        items[i].irValue=Math.round(remaining*100)/100;
+      }else{
+        items[i].irValue=Math.round(irOficio*items[i].valorTotal/totalVal*100)/100;
+        remaining-=items[i].irValue;
+      }
+      items[i].valorLiquido=Math.round((items[i].valorTotal-items[i].irValue)*100)/100;
+    }
+  }
 
   return{oficioNum,periodo,endDate,valorBruto,irOficio,items,rowCount:rows.length};
 }
@@ -820,25 +837,24 @@ function renderImportPreview(){
     <tr><th>Produto</th><th>Servico</th><th class="text-end">Tarifa</th><th class="text-center">Qtd</th><th class="text-end">Val.Total</th><th class="text-end">IR 2,4%</th><th class="text-end">Liquido</th><th>Empenho</th></tr></thead><tbody>`;
 
     r.items.forEach(it=>{
-      let ir=Math.round(it.valorTotal*IR_RATE*100)/100;
       let emp=loadData().empenhos.find(e=>e.se===it.se);
       html+=`<tr class="${it.matched?'':'table-warning'}"><td><small>${it.produto}</small></td><td>${it.servico}${!it.matched?' <i class="bi bi-exclamation-triangle text-warning" title="Nao mapeado"></i>':''}</td>
       <td class="text-end">${brl0(it.valorUnit)}</td><td class="text-center fw-bold">${it.qtd.toLocaleString('pt-BR')}</td>
-      <td class="text-end">${brl0(it.valorTotal)}</td><td class="text-end text-danger">${brl0(ir)}</td>
-      <td class="text-end fw-bold">${brl0(it.valorTotal-ir)}</td>
+      <td class="text-end">${brl0(it.valorTotal)}</td><td class="text-end text-danger">${brl0(it.irValue)}</td>
+      <td class="text-end fw-bold">${brl0(it.valorLiquido)}</td>
       <td><span class="badge bg-secondary">NE ${emp?emp.number:'?'} SE ${it.se}</span></td></tr>`;
     });
 
     let subTot=r.items.reduce((s,i)=>s+i.valorTotal,0);
-    let subIR=Math.round(subTot*IR_RATE*100)/100;
-    html+=`<tr class="fw-bold table-light"><td colspan="4">Subtotal Oficio</td><td class="text-end">${brl0(subTot)}</td>
+    let subIR=r.items.reduce((s,i)=>s+i.irValue,0);
+    html+=`<tr class="fw-bold table-light"><td colspan="4">Subtotal Oficio (IR conforme oficio: ${brl0(r.irOficio)})</td><td class="text-end">${brl0(subTot)}</td>
     <td class="text-end text-danger">${brl0(subIR)}</td><td class="text-end">${brl0(subTot-subIR)}</td><td></td></tr>
     </tbody></table></div></div></div>`;
   });
 
   // Grand total
   let gBruto=importResults.reduce((s,r)=>s+r.items.reduce((a,i)=>a+i.valorTotal,0),0);
-  let gIR=Math.round(gBruto*IR_RATE*100)/100;
+  let gIR=importResults.reduce((s,r)=>s+r.irOficio,0);
   html+=`<div class="card border-primary mt-3"><div class="card-body py-2 d-flex justify-content-between align-items-center">
   <strong>TOTAL GERAL</strong>
   <div><span class="me-3">Bruto: <strong>${brl0(gBruto)}</strong></span>
@@ -871,13 +887,12 @@ function confirmImport(){
   importResults.forEach(r=>{
     r.items.forEach(it=>{
       let emp=emps.find(e=>e.se===it.se)||emps[0];
-      let ir=Math.round(it.valorTotal*IR_RATE*100)/100;
       data.items.push({
         id:data.nextItemId++,compId:comp.id,empId:emp.id,
         produto:it.produto,servico:it.servico,periodo:r.periodo||'',
         oficioNum:r.oficioNum||'',
         valorUnit:it.valorUnit,qtd:it.qtd,irOn:true,
-        valorTotal:it.valorTotal,irValue:ir,valorLiquido:it.valorTotal-ir
+        valorTotal:it.valorTotal,irValue:it.irValue,valorLiquido:it.valorLiquido
       });
       count++;
     });
