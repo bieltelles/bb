@@ -108,7 +108,8 @@ const SERVICE_TYPES=[
 {produto:'PAGAMENTOS DIVERSOS',nome:'Tarifa sobre Pagamentos Cred Cta',se:'92',valor:1.02},
 {produto:'PAGAMENTOS DIVERSOS',nome:'Tarifa sobre Pagamentos DOC/TED',se:'92',valor:4.51},
 {produto:'PAGAMENTO DE SALARIO',nome:'Tarifa Pgto Salario Cred Conta',se:'93',valor:1.02},
-{produto:'PAGAMENTOS DIVERSOS',nome:'Tarif Lib/Ant Float Pagtos Div',se:'92',valor:0}
+{produto:'PAGAMENTOS DIVERSOS',nome:'Tarif Lib/Ant Float Pagtos Div',se:'92',valor:0},
+{produto:'ORBAN',nome:'Tarifa Ordem Bancaria-DOC',se:'92',valor:0}
 ];
 
 const DEFAULT_EMPENHOS=[
@@ -675,7 +676,8 @@ const PDF_MAP=[
 {re:/pag fornec.*cr/i,t:1.02,idx:12},{re:/pgto fornecedores/i,t:4.51,idx:13},
 {re:/tarifa sobre pag/i,t:1.02,idx:14},{re:/tarifa sobre pag/i,t:4.51,idx:15},
 {re:/pgto sal/i,t:1.02,idx:16},
-{re:/float.*pagt|lib.*ant.*float/i,t:null,idx:17}
+{re:/float.*pagt|lib.*ant.*float/i,t:null,idx:17},
+{re:/ordem banc.*doc/i,t:null,idx:18}
 ];
 
 function parseBRLval(s){return parseFloat(s.replace(/\./g,'').replace(',','.'))}
