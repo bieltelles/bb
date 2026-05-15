@@ -48,6 +48,9 @@ SERVICE_MAP = [
     # Tarifa que aparece em alguns meses - Float Pagamentos Diversos
     (re.compile(r'float.*pagt|lib.*ant.*float', re.I), None,
      'PAGAMENTOS DIVERSOS', 'Tarif Lib/Ant Float Pagtos Div', '92'),
+    # Ordem Bancaria DOC - tarifa de pagamento (SE 92)
+    (re.compile(r'ordem banc.*doc', re.I), None,
+     'ORBAN', 'Tarifa Ordem Bancaria-DOC', '92'),
 ]
 
 ROW_REGEX = re.compile(
